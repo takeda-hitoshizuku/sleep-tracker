@@ -382,10 +382,16 @@ function closeEditModal() {
 
 document.getElementById('modal-confirm').addEventListener('click', () => {
   if (!pendingEdit) return;
-  const val = document.getElementById('modal-input').value;
-  if (!val) { showToast('時刻を入力してください'); return; }
-  const iso = localToIso(val);
-  pendingEdit.onConfirm(iso);
+  const inputEl = document.getElementById('modal-input');
+  if (inputEl.style.display !== 'none') {
+    // 時刻編集モード: 値が必要
+    const val = inputEl.value;
+    if (!val) { showToast('時刻を入力してください'); return; }
+    pendingEdit.onConfirm(localToIso(val));
+  } else {
+    // 確認ダイアログモード: 値不要
+    pendingEdit.onConfirm(null);
+  }
   closeEditModal();
 });
 
