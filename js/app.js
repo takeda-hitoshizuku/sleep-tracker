@@ -613,34 +613,84 @@ function renderActions(state, s) {
   let html = '';
 
   if (state === 'idle') {
-    html = `<button class="btn-primary" id="btn-bed">🛏 布団に入る</button>`;
-
-    // 直近セッション完了後のサマリーを表示しない（renderSummaryCard経由で別途表示）
+    html = `
+      <button class="btn-action btn-action--primary" id="btn-bed">
+        <span class="btn-action__icon">🛏</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">布団に入る</span>
+          <span class="btn-action__sub">睡眠記録を開始します</span>
+        </span>
+      </button>
+    `;
 
   } else if (state === 'in_bed') {
     const toiletCount = (s.toiletTrips || []).length;
-    const toiletLabel = toiletCount > 0 ? `🚽 トイレ（${toiletCount}回）` : '🚽 トイレ';
+    const toiletLabel = toiletCount > 0 ? `トイレ（${toiletCount}回）` : 'トイレ';
     html = `
-      <button class="btn-sleep" id="btn-sleep">💤 眠る（推定）</button>
-      <button class="btn-toilet" id="btn-toilet">${toiletLabel}</button>
-      <div class="actions-row">
-        <button class="btn-secondary" id="btn-out-no-sleep">布団から出る</button>
-      </div>
+      <button class="btn-action btn-action--sleep" id="btn-sleep">
+        <span class="btn-action__icon">💤</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">眠る（推定）</span>
+          <span class="btn-action__sub">眠れたと思ったらタップ</span>
+        </span>
+      </button>
+      <button class="btn-action btn-action--toilet" id="btn-toilet">
+        <span class="btn-action__icon">🚽</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">${toiletLabel}</span>
+          <span class="btn-action__sub">トイレに行った時刻を記録</span>
+        </span>
+      </button>
+      <button class="btn-action btn-action--out" id="btn-out-no-sleep">
+        <span class="btn-action__icon">🚶</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">布団から出る</span>
+          <span class="btn-action__sub">眠れなかった場合</span>
+        </span>
+      </button>
     `;
   } else if (state === 'sleeping') {
     html = `
-      <button class="btn-wake" id="btn-wake">☀️ 目覚める</button>
-      <button class="btn-toilet" id="btn-toilet" style="opacity:0.7">🚽 トイレ（起床せず記録）</button>
+      <button class="btn-action btn-action--wake" id="btn-wake">
+        <span class="btn-action__icon">☀️</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">目覚める</span>
+          <span class="btn-action__sub">目が覚めたらタップ</span>
+        </span>
+      </button>
+      <button class="btn-action btn-action--toilet btn-action--dim" id="btn-toilet">
+        <span class="btn-action__icon">🚽</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">トイレ</span>
+          <span class="btn-action__sub">起床せず記録</span>
+        </span>
+      </button>
     `;
   } else if (state === 'awake_in_bed') {
     const toiletCount = (s.toiletTrips || []).length;
-    const toiletLabel = toiletCount > 0 ? `🚽 トイレ（${toiletCount}回）` : '🚽 トイレ';
+    const toiletLabel = toiletCount > 0 ? `トイレ（${toiletCount}回）` : 'トイレ';
     html = `
-      <button class="btn-sleep" id="btn-sleep">💤 また眠る（推定）</button>
-      <button class="btn-toilet" id="btn-toilet">${toiletLabel}</button>
-      <div class="actions-row">
-        <button class="btn-out" id="btn-out">起床・布団から出る</button>
-      </div>
+      <button class="btn-action btn-action--sleep" id="btn-sleep">
+        <span class="btn-action__icon">💤</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">また眠る（推定）</span>
+          <span class="btn-action__sub">再び眠れたらタップ</span>
+        </span>
+      </button>
+      <button class="btn-action btn-action--toilet" id="btn-toilet">
+        <span class="btn-action__icon">🚽</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">${toiletLabel}</span>
+          <span class="btn-action__sub">トイレに行った時刻を記録</span>
+        </span>
+      </button>
+      <button class="btn-action btn-action--primary-out" id="btn-out">
+        <span class="btn-action__icon">🌅</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">起床・布団から出る</span>
+          <span class="btn-action__sub">記録を完了して保存</span>
+        </span>
+      </button>
     `;
   }
 
@@ -1160,7 +1210,7 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(() => {
+    navigator.serviceWorker.register('./sw.js').then(() => {
       console.log('Service Worker 登録完了');
     }).catch((err) => {
       console.warn('Service Worker 登録失敗:', err);

@@ -1,14 +1,17 @@
 // Service Worker for 睡眠トラッカー PWA
-const CACHE_NAME = 'sleep-tracker-v2';
+const CACHE_NAME = 'sleep-tracker-v3';
+
+// self.registration.scope を使って GitHub Pages のサブパスに対応
+const SCOPE = self.registration.scope;
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/css/style.css',
-  '/js/app.js',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/icon-180.png',
+  SCOPE,
+  `${SCOPE}index.html`,
+  `${SCOPE}manifest.json`,
+  `${SCOPE}css/style.css`,
+  `${SCOPE}js/app.js`,
+  `${SCOPE}icons/icon-192.png`,
+  `${SCOPE}icons/icon-512.png`,
+  `${SCOPE}icons/icon-180.png`,
 ];
 
 // Install: cache all assets
@@ -59,7 +62,7 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           // For navigation requests, return the cached index.html
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match(`${SCOPE}index.html`);
           }
         });
     })

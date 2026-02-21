@@ -298,23 +298,111 @@ body {
   margin-bottom: 16px;
 }
 
-.actions-row {
+/* --- Material Design 風アクションボタン --- */
+.btn-action {
+  width: 100%;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border: none;
+  border-radius: 20px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+  -webkit-user-select: none;
+  user-select: none;
+  text-align: left;
+  min-height: 72px;
 }
 
-.actions-row > * {
+.btn-action:active {
+  transform: scale(0.97);
+  filter: brightness(0.88);
+}
+
+.btn-action__icon {
+  font-size: 30px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 40px;
+  text-align: center;
+}
+
+.btn-action__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   flex: 1;
 }
 
+.btn-action__label {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.btn-action__sub {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+/* 布団に入る */
+.btn-action--primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(108, 142, 232, 0.4);
+}
+
+/* 眠る */
+.btn-action--sleep {
+  background: var(--sleep-color);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(124, 110, 232, 0.4);
+}
+
+/* 目覚める */
+.btn-action--wake {
+  background: var(--warning);
+  color: #1a1200;
+  box-shadow: 0 4px 18px rgba(232, 200, 124, 0.35);
+}
+
+/* 起床・布団から出る */
+.btn-action--primary-out {
+  background: var(--success);
+  color: #061a0f;
+  box-shadow: 0 4px 18px rgba(94, 203, 142, 0.35);
+}
+
+/* 布団から出る（眠れなかった） */
+.btn-action--out {
+  background: var(--surface2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* トイレ */
+.btn-action--toilet {
+  background: rgba(232, 139, 165, 0.12);
+  color: var(--toilet-color);
+  border: 1px solid rgba(232, 139, 165, 0.3);
+}
+
+.btn-action--dim {
+  opacity: 0.75;
+}
+
+/* モーダル内の既存ボタン（互換維持） */
 .btn-primary {
   width: 100%;
-  padding: 17px 20px;
+  padding: 14px 20px;
   background: var(--primary);
   color: #fff;
   border: none;
   border-radius: var(--radius);
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -330,7 +418,7 @@ body {
 
 .btn-secondary {
   width: 100%;
-  padding: 15px 20px;
+  padding: 14px 20px;
   background: var(--surface2);
   color: var(--text);
   border: 1px solid var(--border);
@@ -346,90 +434,6 @@ body {
 
 .btn-secondary:active {
   background: var(--surface3);
-  transform: scale(0.98);
-}
-
-.btn-sleep {
-  width: 100%;
-  padding: 17px 20px;
-  background: var(--sleep-color);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  font-size: 17px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.btn-sleep:active {
-  background: #6459cc;
-  transform: scale(0.98);
-}
-
-.btn-wake {
-  width: 100%;
-  padding: 17px 20px;
-  background: var(--warning);
-  color: #1a1400;
-  border: none;
-  border-radius: var(--radius);
-  font-size: 17px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.btn-wake:active {
-  background: #d4a84a;
-  transform: scale(0.98);
-}
-
-.btn-out {
-  width: 100%;
-  padding: 15px 20px;
-  background: var(--success);
-  color: #0a2015;
-  border: none;
-  border-radius: var(--radius);
-  font-size: 16px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.btn-out:active {
-  background: #4ab876;
-  transform: scale(0.98);
-}
-
-.btn-toilet {
-  width: 100%;
-  padding: 13px 20px;
-  background: rgba(232, 139, 165, 0.1);
-  color: var(--toilet-color);
-  border: 1px solid rgba(232, 139, 165, 0.35);
-  border-radius: var(--radius);
-  font-size: 16px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.btn-toilet:active {
-  background: rgba(232, 139, 165, 0.22);
   transform: scale(0.98);
 }
 
