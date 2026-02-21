@@ -14,6 +14,7 @@
  *       wakeTime: ISO string|null  // 目覚めた時間
  *     }
  *   ],
+ *   toiletTrips: ISO string[],    // トイレに行った時刻のリスト
  *   notes: string                 // メモ
  * }
  */
@@ -35,6 +36,13 @@ const DB = {
       // マイグレーション: 旧データ構造対応
       if (!data.sessions) data.sessions = [];
       if (!('currentSession' in data)) data.currentSession = null;
+      // toiletTrips フィールドの追加（旧データ対応）
+      if (data.currentSession && !data.currentSession.toiletTrips) {
+        data.currentSession.toiletTrips = [];
+      }
+      data.sessions.forEach((s) => {
+        if (!s.toiletTrips) s.toiletTrips = [];
+      });
       return data;
     } catch (e) {
       console.error('データ読み込みエラー:', e);
@@ -105,6 +113,7 @@ function actionBed() {
     bedTime: now,
     outOfBedTime: null,
     cycles: [],
+    toiletTrips: [],
     notes: ''
   };
   DB.save(appData);
@@ -135,6 +144,26 @@ function actionWake() {
   DB.save(appData);
   vibrate([20]);
   render();
+}
+
+function actionToilet() {
+  const s = appData.currentSession;
+  if (!s) return;
+  const now = new Date().toISOString();
+  s.toiletTrips.push(now);
+  DB.save(appData);
+  vibrate([15]);
+  renderTimeline(s);
+  showToast(`🚽 トイレ記録 ${fmtTime(now)}（${s.toiletTrips.length}回目）`);
+}
+
+function deleteToiletTrip(index) {
+  const s = appData.currentSession;
+  if (!s) return;
+  s.toiletTrips.splice(index, 1);
+  DB.save(appData);
+  renderTimeline(s);
+  showToast('トイレ記録を取り消しました');
 }
 
 function actionOutOfBed() {
@@ -486,16 +515,7 @@ function updateElapsed(getMsFunc) {
   clockInterval = setInterval(update, 1000);
 }
 
-function renderTimeline(s) {
-  const section = document.getElementById('timeline-section');
-  const container = document.getElementById('timeline');
-
-  if (!s) {
-    section.style.display = 'none';
-    return;
-  }
-
-  section.style.display = 'block';
+function buildTimelineItems(s, isCurrentSession) {
   const items = [];
 
   // 入床
@@ -503,19 +523,17 @@ function renderTimeline(s) {
     type: 'bed',
     label: '布団に入る',
     time: s.bedTime,
-    editFn: () => editBedTime()
+    editFn: isCurrentSession ? () => editBedTime() : null
   });
 
   // 睡眠サイクル
   s.cycles.forEach((cycle, i) => {
-    const isFirstSleep = i === 0;
     items.push({
       type: 'sleep',
-      label: isFirstSleep ? '眠る（推定）' : 'また眠る（推定）',
+      label: i === 0 ? '眠る（推定）' : 'また眠る（推定）',
       time: cycle.sleepTime,
-      editFn: () => editSleepTime(i)
+      editFn: isCurrentSession ? () => editSleepTime(i) : null
     });
-
     if (cycle.wakeTime) {
       const sleptMs = new Date(cycle.wakeTime) - new Date(cycle.sleepTime);
       items.push({
@@ -523,9 +541,19 @@ function renderTimeline(s) {
         label: '目覚める',
         time: cycle.wakeTime,
         duration: sleptMs > 0 ? `睡眠: ${fmtMs(sleptMs)}` : null,
-        editFn: () => editWakeTime(i)
+        editFn: isCurrentSession ? () => editWakeTime(i) : null
       });
     }
+  });
+
+  // トイレ
+  (s.toiletTrips || []).forEach((trip, i) => {
+    items.push({
+      type: 'toilet',
+      label: 'トイレ',
+      time: trip,
+      deleteFn: isCurrentSession ? () => deleteToiletTrip(i) : null
+    });
   });
 
   // 離床
@@ -538,6 +566,24 @@ function renderTimeline(s) {
     });
   }
 
+  // 時系列でソート（入床は先頭固定）
+  const [bedItem, ...rest] = items;
+  rest.sort((a, b) => new Date(a.time) - new Date(b.time));
+  return [bedItem, ...rest];
+}
+
+function renderTimeline(s) {
+  const section = document.getElementById('timeline-section');
+  const container = document.getElementById('timeline');
+
+  if (!s) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  const items = buildTimelineItems(s, true);
+
   container.innerHTML = items.map((item, idx) => `
     <div class="timeline-item" role="listitem">
       <div class="timeline-dot ${item.type}"></div>
@@ -547,14 +593,18 @@ function renderTimeline(s) {
         ${item.duration ? `<div class="timeline-duration">${item.duration}</div>` : ''}
       </div>
       <div class="timeline-time">${fmtTime(item.time)}</div>
-      ${item.editFn ? `<button class="edit-btn" data-idx="${idx}">修正</button>` : ''}
+      ${item.editFn ? `<button class="edit-btn" data-edit="${idx}">修正</button>` : ''}
+      ${item.deleteFn ? `<button class="edit-btn" data-del="${idx}" style="color:var(--danger);border-color:var(--danger)">取消</button>` : ''}
     </div>
   `).join('');
 
-  // 修正ボタンのイベント
-  container.querySelectorAll('.edit-btn').forEach((btn) => {
-    const idx = parseInt(btn.dataset.idx);
+  container.querySelectorAll('[data-edit]').forEach((btn) => {
+    const idx = parseInt(btn.dataset.edit);
     btn.addEventListener('click', () => items[idx].editFn());
+  });
+  container.querySelectorAll('[data-del]').forEach((btn) => {
+    const idx = parseInt(btn.dataset.del);
+    btn.addEventListener('click', () => items[idx].deleteFn());
   });
 }
 
@@ -568,21 +618,26 @@ function renderActions(state, s) {
     // 直近セッション完了後のサマリーを表示しない（renderSummaryCard経由で別途表示）
 
   } else if (state === 'in_bed') {
-    const hasAnyCycle = s.cycles.length > 0;
+    const toiletCount = (s.toiletTrips || []).length;
+    const toiletLabel = toiletCount > 0 ? `🚽 トイレ（${toiletCount}回）` : '🚽 トイレ';
     html = `
       <button class="btn-sleep" id="btn-sleep">💤 眠る（推定）</button>
+      <button class="btn-toilet" id="btn-toilet">${toiletLabel}</button>
       <div class="actions-row">
         <button class="btn-secondary" id="btn-out-no-sleep">布団から出る</button>
       </div>
     `;
-    if (hasAnyCycle) {
-      // 再び眠れない場合（覚醒後）は「布団から出る」だけでOK
-    }
   } else if (state === 'sleeping') {
-    html = `<button class="btn-wake" id="btn-wake">☀️ 目覚める</button>`;
+    html = `
+      <button class="btn-wake" id="btn-wake">☀️ 目覚める</button>
+      <button class="btn-toilet" id="btn-toilet" style="opacity:0.7">🚽 トイレ（起床せず記録）</button>
+    `;
   } else if (state === 'awake_in_bed') {
+    const toiletCount = (s.toiletTrips || []).length;
+    const toiletLabel = toiletCount > 0 ? `🚽 トイレ（${toiletCount}回）` : '🚽 トイレ';
     html = `
       <button class="btn-sleep" id="btn-sleep">💤 また眠る（推定）</button>
+      <button class="btn-toilet" id="btn-toilet">${toiletLabel}</button>
       <div class="actions-row">
         <button class="btn-out" id="btn-out">起床・布団から出る</button>
       </div>
@@ -596,6 +651,7 @@ function renderActions(state, s) {
   document.getElementById('btn-sleep')?.addEventListener('click', actionSleep);
   document.getElementById('btn-wake')?.addEventListener('click', actionWake);
   document.getElementById('btn-out')?.addEventListener('click', actionOutOfBed);
+  document.getElementById('btn-toilet')?.addEventListener('click', actionToilet);
   document.getElementById('btn-out-no-sleep')?.addEventListener('click', () => {
     // 一度も眠れなかった場合の離床
     if (s.cycles.length === 0) {
@@ -664,6 +720,7 @@ function renderSessionSummaryHTML(session) {
   const onset = sleepOnsetLatencyMs(session);
   const awk = awakeningCount(session);
   const waso = wasoMs(session);
+  const toilet = (session.toiletTrips || []).length;
   const effCls = efficiencyClass(eff);
 
   const effBar = eff != null ? `
@@ -710,6 +767,11 @@ function renderSessionSummaryHTML(session) {
         <span class="summary-value">${fmtMs(waso)}</span>
         <span class="summary-label">覚醒合計時間</span>
       </div>` : ''}
+      ${toilet > 0 ? `
+      <div class="summary-item">
+        <span class="summary-value" style="color:var(--toilet-color)">${toilet}回</span>
+        <span class="summary-label">夜間頻尿</span>
+      </div>` : ''}
     </div>
     ${effBar}
     <button class="btn-secondary" id="edit-out-btn" style="font-size:13px;padding:10px">離床時刻を修正</button>
@@ -740,6 +802,7 @@ function renderHistory() {
     const sleeping = totalSleepMs(s);
     const inBed = timeInBedMs(s);
     const awk = awakeningCount(s);
+    const toilet = (s.toiletTrips || []).length;
 
     const bedStr = fmtTime(s.bedTime);
     const outStr = s.outOfBedTime ? fmtTime(s.outOfBedTime) : '記録中';
@@ -775,6 +838,9 @@ function renderHistory() {
           ${s.cycles.length === 0 ? `
           <span class="history-meta-item" style="color:var(--danger)">不眠</span>
           ` : ''}
+          ${toilet > 0 ? `
+          <span class="history-meta-item" style="color:var(--toilet-color)">🚽${toilet}回</span>
+          ` : ''}
         </div>
       </div>
     `;
@@ -808,30 +874,11 @@ function openDetailModal(session, idx) {
   const onset = sleepOnsetLatencyMs(session);
   const awk = awakeningCount(session);
   const waso = wasoMs(session);
+  const toilet = (session.toiletTrips || []).length;
   const effCls = efficiencyClass(eff);
 
-  // タイムライン詳細
-  const timelineItems = [];
-  timelineItems.push({ type: 'bed', label: '布団に入る', time: session.bedTime });
-  session.cycles.forEach((c, i) => {
-    timelineItems.push({
-      type: 'sleep',
-      label: i === 0 ? '眠る' : 'また眠る',
-      time: c.sleepTime
-    });
-    if (c.wakeTime) {
-      const dur = new Date(c.wakeTime) - new Date(c.sleepTime);
-      timelineItems.push({
-        type: 'wake',
-        label: '目覚める',
-        time: c.wakeTime,
-        duration: dur > 0 ? fmtMs(dur) : null
-      });
-    }
-  });
-  if (session.outOfBedTime) {
-    timelineItems.push({ type: 'out', label: '布団から出る', time: session.outOfBedTime });
-  }
+  // タイムライン詳細（buildTimelineItemsを使用してトイレも含む）
+  const timelineItems = buildTimelineItems(session, false);
 
   const timelineHTML = timelineItems.map((item, i) => `
     <div class="timeline-item" role="listitem">
@@ -881,6 +928,12 @@ function openDetailModal(session, idx) {
       <div class="detail-stat-row">
         <span class="detail-stat-label" style="color:var(--danger)">不眠の夜</span>
         <span class="detail-stat-value">😔</span>
+      </div>
+      ` : ''}
+      ${toilet > 0 ? `
+      <div class="detail-stat-row">
+        <span class="detail-stat-label" style="color:var(--toilet-color)">🚽 夜間頻尿</span>
+        <span class="detail-stat-value" style="color:var(--toilet-color)">${toilet}回</span>
       </div>
       ` : ''}
     </div>
@@ -956,6 +1009,7 @@ function renderStats() {
   const effList        = sessions.map(sleepEfficiency).filter((v) => v != null);
   const onsetList      = sessions.map(sleepOnsetLatencyMs).filter((v) => v != null);
   const awkList        = sessions.map(awakeningCount);
+  const toiletList     = sessions.map((s) => (s.toiletTrips || []).length);
   const insomniaCount  = sessions.filter((s) => s.cycles.length === 0).length;
 
   const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
@@ -965,6 +1019,7 @@ function renderStats() {
   const avgEff    = effList.length ? Math.round(avg(effList)) : null;
   const avgOnset  = onsetList.length ? Math.round(avg(onsetList)) : null;
   const avgAwk    = sessions.length ? (avg(awkList)).toFixed(1) : '0';
+  const avgToilet = sessions.length ? (avg(toiletList)).toFixed(1) : '0';
   const effCls    = efficiencyClass(avgEff);
 
   // バーチャート用: 最大7〜30件を表示
@@ -1013,6 +1068,10 @@ function renderStats() {
       <div class="stats-card">
         <span class="stats-value">${avgAwk}</span>
         <span class="stats-label">平均<br>中途覚醒回数</span>
+      </div>
+      <div class="stats-card">
+        <span class="stats-value" style="color:var(--toilet-color)">${avgToilet}</span>
+        <span class="stats-label">平均<br>夜間頻尿回数</span>
       </div>
       ${insomniaCount > 0 ? `
       <div class="stats-card">

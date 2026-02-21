@@ -23,6 +23,7 @@
   --bed-color:    #4a9fe8;   /* 入床 - 青 */
   --wake-color:   #e8a85c;   /* 覚醒 - オレンジ */
   --out-color:    #5ecb8e;   /* 離床 - 緑 */
+  --toilet-color: #e88ba5;   /* トイレ - ピンク */
 
   --radius-sm: 10px;
   --radius:    16px;
@@ -228,10 +229,11 @@ body {
   flex-shrink: 0;
 }
 
-.timeline-dot.bed   { background: var(--bed-color); }
-.timeline-dot.sleep { background: var(--sleep-color); }
-.timeline-dot.wake  { background: var(--wake-color); }
-.timeline-dot.out   { background: var(--out-color); }
+.timeline-dot.bed    { background: var(--bed-color); }
+.timeline-dot.sleep  { background: var(--sleep-color); }
+.timeline-dot.wake   { background: var(--wake-color); }
+.timeline-dot.out    { background: var(--out-color); }
+.timeline-dot.toilet { background: var(--toilet-color); }
 
 .timeline-line {
   position: absolute;
@@ -407,6 +409,27 @@ body {
 
 .btn-out:active {
   background: #4ab876;
+  transform: scale(0.98);
+}
+
+.btn-toilet {
+  width: 100%;
+  padding: 13px 20px;
+  background: rgba(232, 139, 165, 0.1);
+  color: var(--toilet-color);
+  border: 1px solid rgba(232, 139, 165, 0.35);
+  border-radius: var(--radius);
+  font-size: 16px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.btn-toilet:active {
+  background: rgba(232, 139, 165, 0.22);
   transform: scale(0.98);
 }
 

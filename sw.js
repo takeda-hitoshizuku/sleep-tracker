@@ -1,5 +1,5 @@
 // Service Worker for 睡眠トラッカー PWA
-const CACHE_NAME = 'sleep-tracker-v1';
+const CACHE_NAME = 'sleep-tracker-v2';
 const ASSETS = [
   '/',
   '/index.html',
