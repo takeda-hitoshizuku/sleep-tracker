@@ -1084,7 +1084,7 @@ async function fetchAIAnalysis(sessions, period) {
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
-      system: 'あなたは睡眠データを分析するフレンドリーなアシスタントです。ユーザーの睡眠記録のパターンや傾向を観察し、一般的な睡眠衛生の視点でコメントしてください。医療的診断は行わず、温かく支持的なトーンで日本語で回答してください。',
+      system: 'あなたは睡眠データを分析するフレンドリーなアシスタントです。ユーザーの睡眠記録のパターンや傾向を観察し、一般的な睡眠衛生の視点でコメントしてください。医療的診断は行わず、温かく支持的なトーンで日本語で回答してください。見出しやセクション名は使わず、自然な文章で回答してください。',
       messages: [{ role: 'user', content: buildSleepAnalysisPrompt(sessions, period) }]
     })
   });
