@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0e1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="睡眠記録">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>睡眠トラッカー</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- ナビゲーション -->
+    <nav class="nav" role="navigation" aria-label="メインナビゲーション">
+      <button class="nav-btn active" data-view="tracker" aria-selected="true">
+        <span class="nav-icon">🌙</span>
+        <span class="nav-label">記録</span>
+      </button>
+      <button class="nav-btn" data-view="history" aria-selected="false">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">履歴</span>
+      </button>
+      <button class="nav-btn" data-view="stats" aria-selected="false">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">統計</span>
+      </button>
+    </nav>
+
+    <!-- 記録ビュー -->
+    <div id="view-tracker" class="view active" role="main">
+      <!-- ステータスカード -->
+      <div class="status-card" id="status-card">
+        <div class="status-icon" id="status-icon" aria-hidden="true">🌙</div>
+        <div class="status-label" id="status-label">就寝前</div>
+        <div class="status-sublabel" id="status-sublabel"></div>
+        <div class="elapsed-display" id="elapsed-display" aria-live="polite"></div>
+      </div>
+
+      <!-- 現在のセッション タイムライン -->
+      <div class="section" id="timeline-section" style="display:none">
+        <div class="section-title">今夜のタイムライン</div>
+        <div class="timeline" id="timeline" role="list"></div>
+      </div>
+
+      <!-- アクションボタン -->
+      <div class="actions" id="actions"></div>
+
+      <!-- セッション完了サマリー -->
+      <div class="summary-card" id="summary-card" style="display:none"></div>
+    </div>
+
+    <!-- 履歴ビュー -->
+    <div id="view-history" class="view" role="main" aria-label="睡眠履歴">
+      <div class="history-header">
+        <h2 class="view-title">睡眠履歴</h2>
+        <button class="btn-icon" id="export-btn" title="データをエクスポート">⬇</button>
+      </div>
+      <div id="history-list" role="list"></div>
+      <div id="history-empty" class="empty-state" style="display:none">
+        <div class="empty-icon">📋</div>
+        <div class="empty-text">記録がまだありません</div>
+      </div>
+    </div>
+
+    <!-- 統計ビュー -->
+    <div id="view-stats" class="view" role="main" aria-label="睡眠統計">
+      <h2 class="view-title">睡眠統計</h2>
+      <div class="period-tabs">
+        <button class="period-tab active" data-days="7">7日間</button>
+        <button class="period-tab" data-days="14">14日間</button>
+        <button class="period-tab" data-days="30">30日間</button>
+      </div>
+      <div id="stats-content"></div>
+      <div id="stats-empty" class="empty-state" style="display:none">
+        <div class="empty-icon">📊</div>
+        <div class="empty-text">統計には最低2件の記録が必要です</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 時刻編集モーダル -->
+  <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title" style="display:none">
+    <div class="modal">
+      <h3 class="modal-title" id="modal-title">時刻を修正</h3>
+      <p class="modal-hint" id="modal-hint"></p>
+      <input type="datetime-local" id="modal-input" class="modal-input">
+      <div class="modal-actions">
+        <button class="btn-secondary" id="modal-cancel">キャンセル</button>
+        <button class="btn-primary" id="modal-confirm">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- セッション詳細モーダル -->
+  <div class="modal-overlay" id="detail-overlay" role="dialog" aria-modal="true" style="display:none">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h3 class="modal-title" id="detail-title">睡眠詳細</h3>
+        <button class="btn-icon" id="detail-close">✕</button>
+      </div>
+      <div id="detail-content"></div>
+      <div class="modal-actions">
+        <button class="btn-danger" id="detail-delete">この記録を削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
