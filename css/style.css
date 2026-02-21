@@ -962,6 +962,58 @@ body {
   animation: pulse 3s ease-in-out infinite;
 }
 
+/* --- AI分析・医師向けレポート --- */
+.ai-section-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.ai-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+
+.ai-key-input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  font-family: 'SF Mono', 'Menlo', monospace;
+  outline: none;
+}
+
+.ai-key-input:focus {
+  border-color: var(--primary);
+}
+
+.ai-result {
+  background: var(--surface2);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text);
+  margin: 4px 0;
+}
+
+.ai-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
 /* --- ダークモード強制 --- */
 @media (prefers-color-scheme: light) {
   /* アプリは常にダークモード */

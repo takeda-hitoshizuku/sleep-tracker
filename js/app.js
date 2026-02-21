@@ -81,6 +81,7 @@ let statsPeriod = 7;
 let pendingEdit = null; // 編集中の項目情報
 let pendingDetailSession = null; // 詳細表示中のセッション
 let confirmCallback = null; // 確認ダイアログのコールバック
+let aiResultCache = null; // AI分析結果キャッシュ { period, result|error|loading }
 
 // ============================================================
 // セッション状態の判定
@@ -1035,6 +1036,248 @@ document.getElementById('detail-delete').addEventListener('click', () => {
 });
 
 // ============================================================
+// AI 分析
+// ============================================================
+
+const AI_KEY_STORAGE = 'sleep-tracker-claude-key';
+
+function buildSleepAnalysisPrompt(sessions, period) {
+  const lines = sessions.map((s) => {
+    const parts = [
+      fmtDate(s.bedTime),
+      `入床${fmtTime(s.bedTime)}→離床${fmtTime(s.outOfBedTime)}`,
+      `睡眠${fmtMs(totalSleepMs(s))} / 床上${fmtMs(timeInBedMs(s))}`,
+    ];
+    const eff = sleepEfficiency(s);
+    if (eff != null) parts.push(`効率${eff}%`);
+    const onset = sleepOnsetLatencyMs(s);
+    if (onset != null) parts.push(`入眠潜時${fmtMs(onset)}`);
+    const awk = awakeningCount(s);
+    if (awk > 0) parts.push(`中途覚醒${awk}回`);
+    const toilet = (s.toiletTrips || []).length;
+    if (toilet > 0) parts.push(`夜間頻尿${toilet}回`);
+    if (s.notes) parts.push(`メモ:${s.notes}`);
+    return parts.join(' | ');
+  }).join('\n');
+  return `過去${period}日間の睡眠記録（新しい順）:\n\n${lines}\n\nこの記録のパターンや傾向について、気づいたことを教えてください。`;
+}
+
+async function fetchAIAnalysis(sessions, period) {
+  const apiKey = localStorage.getItem(AI_KEY_STORAGE);
+  if (!apiKey) throw new Error('APIキーが設定されていません');
+  if (sessions.length === 0) throw new Error('分析できる記録がありません');
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system: 'あなたは睡眠データを分析するフレンドリーなアシスタントです。ユーザーの睡眠記録のパターンや傾向を観察し、一般的な睡眠衛生の視点でコメントしてください。医療的診断は行わず、温かく支持的なトーンで日本語で回答してください。',
+      messages: [{ role: 'user', content: buildSleepAnalysisPrompt(sessions, period) }]
+    })
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error?.message || `APIエラー (${res.status})`);
+  }
+  const data = await res.json();
+  return data.content?.[0]?.text || '(応答なし)';
+}
+
+function renderAISection(sessions, period) {
+  if (currentView !== 'stats') return;
+  const statsContent = document.getElementById('stats-content');
+  if (!statsContent) return;
+
+  let section = document.getElementById('ai-section');
+  if (!section) {
+    section = document.createElement('div');
+    section.id = 'ai-section';
+    statsContent.appendChild(section);
+  }
+
+  const hasKey = !!localStorage.getItem(AI_KEY_STORAGE);
+  const cache = aiResultCache;
+  const cacheValid = cache && cache.period === period;
+
+  let inner = `<div class="section-title" style="margin-bottom:12px">🤖 AI分析</div>`;
+
+  if (!hasKey) {
+    inner += `
+      <p class="ai-hint">Anthropic APIキーを設定するとAIが睡眠パターンを分析します。キーはこの端末のみに保存されます。</p>
+      <div style="display:flex;gap:8px">
+        <input type="password" id="ai-key-input" class="ai-key-input" placeholder="sk-ant-api03-...">
+        <button class="btn-secondary" id="ai-key-save" style="width:auto;padding:12px 16px;white-space:nowrap;font-size:14px">保存</button>
+      </div>
+    `;
+  } else if (cacheValid && cache.loading) {
+    inner += `<div class="ai-loading">✨ 分析中…</div>`;
+  } else if (cacheValid && cache.error) {
+    inner += `
+      <div style="color:var(--danger);font-size:13px;margin-bottom:10px">⚠ ${cache.error}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary" id="ai-run" style="font-size:14px">再試行</button>
+        <button class="btn-secondary" id="ai-clear-key" style="font-size:14px">キーを変更</button>
+      </div>
+    `;
+  } else if (cacheValid && cache.result) {
+    inner += `
+      <div class="ai-result">${cache.result.replace(/\n/g, '<br>')}</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn-secondary" id="ai-run" style="font-size:13px;padding:10px">再分析</button>
+        <button class="btn-secondary" id="ai-clear-key" style="font-size:13px;padding:10px">キーを変更</button>
+      </div>
+    `;
+  } else {
+    inner += `
+      <button class="btn-secondary" id="ai-run" style="width:100%">この${period}日間を分析する</button>
+      <div style="text-align:center;margin-top:8px">
+        <button id="ai-clear-key" style="background:none;border:none;color:var(--text-faint);font-size:12px;cursor:pointer;font-family:inherit">APIキーを変更</button>
+      </div>
+    `;
+  }
+
+  section.innerHTML = `<div class="ai-section-card">${inner}</div>`;
+
+  document.getElementById('ai-key-save')?.addEventListener('click', () => {
+    const key = (document.getElementById('ai-key-input')?.value || '').trim();
+    if (!key) { showToast('APIキーを入力してください'); return; }
+    localStorage.setItem(AI_KEY_STORAGE, key);
+    aiResultCache = null;
+    renderAISection(sessions, period);
+  });
+
+  document.getElementById('ai-clear-key')?.addEventListener('click', () => {
+    localStorage.removeItem(AI_KEY_STORAGE);
+    aiResultCache = null;
+    renderAISection(sessions, period);
+  });
+
+  document.getElementById('ai-run')?.addEventListener('click', async () => {
+    aiResultCache = { period, loading: true };
+    renderAISection(sessions, period);
+    try {
+      const result = await fetchAIAnalysis(sessions, period);
+      aiResultCache = { period, result };
+    } catch (e) {
+      aiResultCache = { period, error: e.message };
+    }
+    if (currentView === 'stats') render();
+  });
+}
+
+// ============================================================
+// 医師向けレポート
+// ============================================================
+
+function generateDoctorReport(sessions, period) {
+  if (sessions.length === 0) return null;
+
+  const avg = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+  const sleepMsList  = sessions.map(totalSleepMs);
+  const inBedMsList  = sessions.map(timeInBedMs);
+  const effList      = sessions.map(sleepEfficiency).filter((v) => v != null);
+  const onsetList    = sessions.map(sleepOnsetLatencyMs).filter((v) => v != null);
+  const awkList      = sessions.map(awakeningCount);
+  const toiletList   = sessions.map((s) => (s.toiletTrips || []).length);
+  const insomniaCount = sessions.filter((s) => s.cycles.length === 0).length;
+
+  const oldest = sessions[sessions.length - 1];
+  const newest = sessions[0];
+  const dateRange = `${fmtDate(oldest.bedTime)} 〜 ${fmtDate(newest.bedTime)}`;
+
+  const rows = sessions.map((s) => {
+    const eff   = sleepEfficiency(s);
+    const onset = sleepOnsetLatencyMs(s);
+    const awk   = awakeningCount(s);
+    const toilet = (s.toiletTrips || []).length;
+    const cols = [
+      fmtDate(s.bedTime),
+      `入床 ${fmtTime(s.bedTime)}`,
+      `離床 ${fmtTime(s.outOfBedTime)}`,
+      `睡眠 ${fmtMs(totalSleepMs(s))}`,
+      eff != null ? `効率 ${eff}%` : '効率 --',
+      onset != null ? `入眠潜時 ${fmtMs(onset)}` : null,
+      awk > 0 ? `覚醒 ${awk}回` : null,
+      toilet > 0 ? `頻尿 ${toilet}回` : null,
+      s.notes ? `(${s.notes})` : null,
+    ].filter(Boolean);
+    return cols.join(' / ');
+  });
+
+  const lines = [
+    '【睡眠記録レポート】',
+    `記録期間: ${dateRange}（${sessions.length}件）`,
+    '',
+    '■ 集計',
+    `平均睡眠時間　　: ${fmtMs(Math.round(avg(sleepMsList)))}`,
+    `平均床上時間　　: ${fmtMs(Math.round(avg(inBedMsList)))}`,
+    effList.length   ? `平均睡眠効率　　: ${Math.round(avg(effList))}%` : null,
+    onsetList.length ? `平均入眠潜時　　: ${fmtMs(Math.round(avg(onsetList)))}` : null,
+    `平均中途覚醒　　: ${avg(awkList).toFixed(1)}回`,
+    avg(toiletList) > 0 ? `平均夜間頻尿　　: ${avg(toiletList).toFixed(1)}回` : null,
+    insomniaCount > 0 ? `不眠の夜　　　　: ${insomniaCount}夜 / ${sessions.length}夜中` : null,
+    '',
+    '■ 個別記録（新しい順）',
+    ...rows,
+    '',
+    `生成: ${new Date().toLocaleString('ja-JP')} / 睡眠トラッカーアプリ`,
+  ].filter((l) => l !== null).join('\n');
+
+  return lines;
+}
+
+function renderReportSection(sessions, period) {
+  if (currentView !== 'stats') return;
+  const statsContent = document.getElementById('stats-content');
+  if (!statsContent) return;
+
+  let section = document.getElementById('report-section');
+  if (!section) {
+    section = document.createElement('div');
+    section.id = 'report-section';
+    statsContent.appendChild(section);
+  }
+
+  section.innerHTML = `
+    <div class="ai-section-card">
+      <div class="section-title" style="margin-bottom:8px">📋 医師向けレポート</div>
+      <p class="ai-hint">事実データのみをまとめます。診察時に共有してください。</p>
+      <button class="btn-secondary" id="report-btn" style="width:100%">レポートを生成・共有</button>
+    </div>
+  `;
+
+  document.getElementById('report-btn')?.addEventListener('click', async () => {
+    const report = generateDoctorReport(sessions, period);
+    if (!report) { showToast('共有できる記録がありません'); return; }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: '睡眠記録レポート', text: report });
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return; // ユーザーがキャンセル
+      }
+    }
+    // Web Share API 非対応時はクリップボードへ
+    try {
+      await navigator.clipboard.writeText(report);
+      showToast('レポートをコピーしました');
+    } catch (e) {
+      showToast('コピーに失敗しました');
+    }
+  });
+}
+
+// ============================================================
 // レンダリング: 統計ビュー
 // ============================================================
 
@@ -1151,6 +1394,10 @@ function renderStats() {
       ${sessions.length}件の記録（過去${statsPeriod}日間）
     </div>
   `;
+
+  // AI分析・医師向けレポートセクションを追加
+  renderAISection(sessions, statsPeriod);
+  renderReportSection(sessions, statsPeriod);
 }
 
 // ============================================================
