@@ -378,75 +378,8 @@ document.getElementById('modal-overlay').addEventListener('click', (e) => {
 });
 
 // ============================================================
-// 時刻編集ロジック
+// 時刻編集ロジック（buildTimelineItems 内にインライン化）
 // ============================================================
-
-function editBedTime() {
-  const s = appData.currentSession;
-  if (!s) return;
-  openEditModal(
-    '入床時刻を修正',
-    '布団に入った時刻を入力してください',
-    s.bedTime,
-    (iso) => {
-      s.bedTime = iso;
-      DB.save(appData);
-      render();
-      showToast('入床時刻を修正しました');
-    }
-  );
-}
-
-function editSleepTime(cycleIndex) {
-  const s = appData.currentSession;
-  if (!s) return;
-  const cycle = s.cycles[cycleIndex];
-  openEditModal(
-    '入眠時刻を修正',
-    '実際に眠り始めたと思う時刻を入力してください',
-    cycle.sleepTime,
-    (iso) => {
-      cycle.sleepTime = iso;
-      DB.save(appData);
-      render();
-      showToast('入眠時刻を修正しました');
-    }
-  );
-}
-
-function editWakeTime(cycleIndex) {
-  const s = appData.currentSession;
-  if (!s) return;
-  const cycle = s.cycles[cycleIndex];
-  if (!cycle.wakeTime) return;
-  openEditModal(
-    '覚醒時刻を修正',
-    '目覚めた時刻を入力してください',
-    cycle.wakeTime,
-    (iso) => {
-      cycle.wakeTime = iso;
-      DB.save(appData);
-      render();
-      showToast('覚醒時刻を修正しました');
-    }
-  );
-}
-
-function editOutOfBedTime() {
-  const s = appData.sessions[0];
-  if (!s || !s.outOfBedTime) return;
-  openEditModal(
-    '離床時刻を修正',
-    '布団から出た時刻を入力してください',
-    s.outOfBedTime,
-    (iso) => {
-      s.outOfBedTime = iso;
-      DB.save(appData);
-      render();
-      showToast('離床時刻を修正しました');
-    }
-  );
-}
 
 // ============================================================
 // レンダリング: 記録ビュー
@@ -515,15 +448,29 @@ function updateElapsed(getMsFunc) {
   clockInterval = setInterval(update, 1000);
 }
 
-function buildTimelineItems(s, isCurrentSession) {
+function buildTimelineItems(s, editOpts) {
+  // editOpts: null（編集ボタンなし）または { afterSave: fn }（編集ボタンあり）
   const items = [];
+
+  const makeEdit = (title, hint, toastMsg, getTime, setTime) => {
+    if (!editOpts) return null;
+    return () => openEditModal(title, hint, getTime(), (iso) => {
+      setTime(iso);
+      DB.save(appData);
+      editOpts.afterSave();
+      showToast(toastMsg);
+    });
+  };
 
   // 入床
   items.push({
     type: 'bed',
     label: '布団に入る',
     time: s.bedTime,
-    editFn: isCurrentSession ? () => editBedTime() : null
+    editFn: makeEdit(
+      '入床時刻を修正', '布団に入った時刻を入力してください', '入床時刻を修正しました',
+      () => s.bedTime, (iso) => { s.bedTime = iso; }
+    )
   });
 
   // 睡眠サイクル
@@ -532,7 +479,10 @@ function buildTimelineItems(s, isCurrentSession) {
       type: 'sleep',
       label: i === 0 ? '眠る（推定）' : 'また眠る（推定）',
       time: cycle.sleepTime,
-      editFn: isCurrentSession ? () => editSleepTime(i) : null
+      editFn: makeEdit(
+        '入眠時刻を修正', '実際に眠り始めたと思う時刻を入力してください', '入眠時刻を修正しました',
+        () => cycle.sleepTime, (iso) => { cycle.sleepTime = iso; }
+      )
     });
     if (cycle.wakeTime) {
       const sleptMs = new Date(cycle.wakeTime) - new Date(cycle.sleepTime);
@@ -541,7 +491,10 @@ function buildTimelineItems(s, isCurrentSession) {
         label: '目覚める',
         time: cycle.wakeTime,
         duration: sleptMs > 0 ? `睡眠: ${fmtMs(sleptMs)}` : null,
-        editFn: isCurrentSession ? () => editWakeTime(i) : null
+        editFn: makeEdit(
+          '覚醒時刻を修正', '目覚めた時刻を入力してください', '覚醒時刻を修正しました',
+          () => cycle.wakeTime, (iso) => { cycle.wakeTime = iso; }
+        )
       });
     }
   });
@@ -552,7 +505,12 @@ function buildTimelineItems(s, isCurrentSession) {
       type: 'toilet',
       label: 'トイレ',
       time: trip,
-      deleteFn: isCurrentSession ? () => deleteToiletTrip(i) : null
+      deleteFn: editOpts ? () => {
+        s.toiletTrips.splice(i, 1);
+        DB.save(appData);
+        editOpts.afterSave();
+        showToast('トイレ記録を取り消しました');
+      } : null
     });
   });
 
@@ -562,7 +520,10 @@ function buildTimelineItems(s, isCurrentSession) {
       type: 'out',
       label: '布団から出る',
       time: s.outOfBedTime,
-      editFn: null
+      editFn: makeEdit(
+        '離床時刻を修正', '布団から出た時刻を入力してください', '離床時刻を修正しました',
+        () => s.outOfBedTime, (iso) => { s.outOfBedTime = iso; }
+      )
     });
   }
 
@@ -572,19 +533,8 @@ function buildTimelineItems(s, isCurrentSession) {
   return [bedItem, ...rest];
 }
 
-function renderTimeline(s) {
-  const section = document.getElementById('timeline-section');
-  const container = document.getElementById('timeline');
-
-  if (!s) {
-    section.style.display = 'none';
-    return;
-  }
-
-  section.style.display = 'block';
-  const items = buildTimelineItems(s, true);
-
-  container.innerHTML = items.map((item, idx) => `
+function createTimelineHTML(items) {
+  return items.map((item, idx) => `
     <div class="timeline-item" role="listitem">
       <div class="timeline-dot ${item.type}"></div>
       ${idx < items.length - 1 ? '<div class="timeline-line"></div>' : ''}
@@ -597,7 +547,9 @@ function renderTimeline(s) {
       ${item.deleteFn ? `<button class="edit-btn" data-del="${idx}" style="color:var(--danger);border-color:var(--danger)">取消</button>` : ''}
     </div>
   `).join('');
+}
 
+function bindTimelineEvents(container, items) {
   container.querySelectorAll('[data-edit]').forEach((btn) => {
     const idx = parseInt(btn.dataset.edit);
     btn.addEventListener('click', () => items[idx].editFn());
@@ -606,6 +558,21 @@ function renderTimeline(s) {
     const idx = parseInt(btn.dataset.del);
     btn.addEventListener('click', () => items[idx].deleteFn());
   });
+}
+
+function renderTimeline(s) {
+  const section = document.getElementById('timeline-section');
+  const container = document.getElementById('timeline');
+
+  if (!s) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+  const items = buildTimelineItems(s, { afterSave: render });
+  container.innerHTML = createTimelineHTML(items);
+  bindTimelineEvents(container, items);
 }
 
 function renderActions(state, s) {
@@ -759,8 +726,13 @@ function showSummaryCard(session) {
   card.style.display = 'block';
   card.innerHTML = renderSessionSummaryHTML(session);
 
-  // 離床時刻修正ボタン
-  card.querySelector('#edit-out-btn')?.addEventListener('click', editOutOfBedTime);
+  // タイムライン描画・編集可能にする
+  const timelineContainer = card.querySelector('#summary-timeline');
+  if (timelineContainer) {
+    const items = buildTimelineItems(session, { afterSave: () => showSummaryCard(session) });
+    timelineContainer.innerHTML = createTimelineHTML(items);
+    bindTimelineEvents(timelineContainer, items);
+  }
 }
 
 function renderSessionSummaryHTML(session) {
@@ -824,7 +796,8 @@ function renderSessionSummaryHTML(session) {
       </div>` : ''}
     </div>
     ${effBar}
-    <button class="btn-secondary" id="edit-out-btn" style="font-size:13px;padding:10px">離床時刻を修正</button>
+    <div class="section-title" style="padding-left:0;margin-bottom:8px;margin-top:16px;font-size:13px">タイムライン（各項目をタップして修正）</div>
+    <div class="timeline" id="summary-timeline" role="list"></div>
   `;
 }
 
@@ -927,20 +900,10 @@ function openDetailModal(session, idx) {
   const toilet = (session.toiletTrips || []).length;
   const effCls = efficiencyClass(eff);
 
-  // タイムライン詳細（buildTimelineItemsを使用してトイレも含む）
-  const timelineItems = buildTimelineItems(session, false);
-
-  const timelineHTML = timelineItems.map((item, i) => `
-    <div class="timeline-item" role="listitem">
-      <div class="timeline-dot ${item.type}"></div>
-      ${i < timelineItems.length - 1 ? '<div class="timeline-line"></div>' : ''}
-      <div class="timeline-content">
-        <div class="timeline-event">${item.label}</div>
-        ${item.duration ? `<div class="timeline-duration">睡眠: ${item.duration}</div>` : ''}
-      </div>
-      <div class="timeline-time">${fmtTime(item.time)}</div>
-    </div>
-  `).join('');
+  // タイムライン詳細（全時刻を編集可能）
+  const afterSave = () => openDetailModal(session, idx);
+  const timelineItems = buildTimelineItems(session, { afterSave });
+  const timelineHTML = createTimelineHTML(timelineItems);
 
   content.innerHTML = `
     <div style="margin-bottom:16px">
@@ -1001,6 +964,10 @@ function openDetailModal(session, idx) {
     session.notes = notesArea.value;
     DB.save(appData);
   });
+
+  // タイムライン編集ボタンのイベントバインド
+  const timelineContainer = content.querySelector('.detail-timeline');
+  bindTimelineEvents(timelineContainer, timelineItems);
 
   overlay.style.display = 'flex';
 }
