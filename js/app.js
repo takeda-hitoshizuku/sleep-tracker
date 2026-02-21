@@ -137,13 +137,30 @@ function actionSleep() {
 function actionWake() {
   const s = appData.currentSession;
   if (!s) return;
-  const lastCycle = s.cycles[s.cycles.length - 1];
-  if (!lastCycle || lastCycle.wakeTime) return;
+  const state = getSessionState();
+  const now = new Date().toISOString();
 
-  lastCycle.wakeTime = new Date().toISOString();
+  if (state === 'in_bed') {
+    // 眠りから自然に目覚めた（入眠時刻は入床時刻で仮登録→タイムラインで修正）
+    s.cycles.push({ sleepTime: s.bedTime, wakeTime: now });
+  } else if (state === 'sleeping') {
+    const lastCycle = s.cycles[s.cycles.length - 1];
+    lastCycle.wakeTime = now;
+  } else if (state === 'awake_in_bed') {
+    // また眠りから目覚めた（前の覚醒時刻を入眠時刻として仮登録→タイムラインで修正）
+    const lastCycle = s.cycles[s.cycles.length - 1];
+    s.cycles.push({ sleepTime: lastCycle.wakeTime, wakeTime: now });
+  } else {
+    return;
+  }
+
   DB.save(appData);
   vibrate([20]);
   render();
+  // 入眠時刻が未入力（仮登録）の場合はヒントを表示
+  if (state === 'in_bed' || state === 'awake_in_bed') {
+    showToast('入眠時刻をタイムラインの「修正」で登録してください');
+  }
 }
 
 function actionToilet() {
@@ -488,7 +505,7 @@ function buildTimelineItems(s, editOpts) {
       const sleptMs = new Date(cycle.wakeTime) - new Date(cycle.sleepTime);
       items.push({
         type: 'wake',
-        label: '目覚める',
+        label: '目覚めた',
         time: cycle.wakeTime,
         duration: sleptMs > 0 ? `睡眠: ${fmtMs(sleptMs)}` : null,
         editFn: makeEdit(
@@ -594,11 +611,18 @@ function renderActions(state, s) {
     const toiletCount = (s.toiletTrips || []).length;
     const toiletLabel = toiletCount > 0 ? `トイレ（${toiletCount}回）` : 'トイレ';
     html = `
+      <button class="btn-action btn-action--wake" id="btn-wake">
+        <span class="btn-action__icon">☀️</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">目覚めた</span>
+          <span class="btn-action__sub">気づいたら起きていた・入眠時刻をあとで修正</span>
+        </span>
+      </button>
       <button class="btn-action btn-action--sleep" id="btn-sleep">
         <span class="btn-action__icon">💤</span>
         <span class="btn-action__body">
           <span class="btn-action__label">眠る（推定）</span>
-          <span class="btn-action__sub">眠れたと思ったらタップ</span>
+          <span class="btn-action__sub">眠れたと思った瞬間にタップ</span>
         </span>
       </button>
       <button class="btn-action btn-action--toilet" id="btn-toilet">
@@ -621,8 +645,15 @@ function renderActions(state, s) {
       <button class="btn-action btn-action--wake" id="btn-wake">
         <span class="btn-action__icon">☀️</span>
         <span class="btn-action__body">
-          <span class="btn-action__label">目覚める</span>
+          <span class="btn-action__label">目覚めた</span>
           <span class="btn-action__sub">目が覚めたらタップ</span>
+        </span>
+      </button>
+      <button class="btn-action btn-action--sleep btn-action--dim" id="btn-sleep" disabled>
+        <span class="btn-action__icon">💤</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">眠る（推定）</span>
+          <span class="btn-action__sub">睡眠中</span>
         </span>
       </button>
       <button class="btn-action btn-action--toilet btn-action--dim" id="btn-toilet">
@@ -637,11 +668,18 @@ function renderActions(state, s) {
     const toiletCount = (s.toiletTrips || []).length;
     const toiletLabel = toiletCount > 0 ? `トイレ（${toiletCount}回）` : 'トイレ';
     html = `
+      <button class="btn-action btn-action--wake" id="btn-wake">
+        <span class="btn-action__icon">☀️</span>
+        <span class="btn-action__body">
+          <span class="btn-action__label">また目覚めた</span>
+          <span class="btn-action__sub">また眠って気づいたら起きていた</span>
+        </span>
+      </button>
       <button class="btn-action btn-action--sleep" id="btn-sleep">
         <span class="btn-action__icon">💤</span>
         <span class="btn-action__body">
           <span class="btn-action__label">また眠る（推定）</span>
-          <span class="btn-action__sub">再び眠れたらタップ</span>
+          <span class="btn-action__sub">再び眠れたと思った瞬間にタップ</span>
         </span>
       </button>
       <button class="btn-action btn-action--toilet" id="btn-toilet">
