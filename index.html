@@ -30,6 +30,10 @@
         <span class="nav-icon">📊</span>
         <span class="nav-label">統計</span>
       </button>
+      <button class="nav-btn" data-view="settings" aria-selected="false">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">設定</span>
+      </button>
     </nav>
 
     <!-- 記録ビュー -->
@@ -80,6 +84,15 @@
       <div id="stats-empty" class="empty-state" style="display:none">
         <div class="empty-icon">📊</div>
         <div class="empty-text">統計には最低2件の記録が必要です</div>
+      </div>
+    </div>
+    <!-- 設定ビュー -->
+    <div id="view-settings" class="view" role="main" aria-label="設定">
+      <h2 class="view-title">設定</h2>
+      <div class="section">
+        <div class="section-title">活動時間帯</div>
+        <p class="settings-hint">この時間帯に床に入っている場合、履歴・レポート・AI分析にフラグを表示します。</p>
+        <div id="schedule-content"></div>
       </div>
     </div>
   </div>
