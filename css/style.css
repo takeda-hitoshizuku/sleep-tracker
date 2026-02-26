@@ -772,6 +772,8 @@ body {
   padding: 24px 20px 20px;
   width: 100%;
   max-width: 480px;
+  max-height: 85dvh;
+  overflow-y: auto;
   animation: slideUp 0.25s ease;
   border-top: 1px solid var(--border);
 }
