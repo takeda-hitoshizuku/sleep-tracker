@@ -1088,6 +1088,67 @@ body {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+/* --- 設定ビュー: スケジュール --- */
+.settings-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.schedule-row {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+
+.schedule-row:last-child {
+  border-bottom: none;
+}
+
+.schedule-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.schedule-day-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 32px;
+}
+
+.schedule-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.schedule-toggle-wrap input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+}
+
+.schedule-toggle-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  min-width: 28px;
+}
+
+.schedule-times {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.schedule-time-sep {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
 /* --- ダークモード強制 --- */
 @media (prefers-color-scheme: light) {
   /* アプリは常にダークモード */

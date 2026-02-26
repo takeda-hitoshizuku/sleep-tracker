@@ -517,7 +517,13 @@ function buildTimelineItems(s, editOpts) {
       editFn: makeEdit(
         '入眠時刻を修正', '実際に眠り始めたと思う時刻を入力してください', '入眠時刻を修正しました',
         () => cycle.sleepTime, (iso) => { cycle.sleepTime = iso; }
-      )
+      ),
+      deleteFn: editOpts ? () => {
+        s.cycles.splice(i, 1);
+        DB.save(appData);
+        editOpts.afterSave();
+        showToast('入眠記録を取り消しました');
+      } : null
     });
     if (cycle.wakeTime) {
       const sleptMs = new Date(cycle.wakeTime) - new Date(cycle.sleepTime);
@@ -529,7 +535,13 @@ function buildTimelineItems(s, editOpts) {
         editFn: makeEdit(
           '覚醒時刻を修正', '目覚めた時刻を入力してください', '覚醒時刻を修正しました',
           () => cycle.wakeTime, (iso) => { cycle.wakeTime = iso; }
-        )
+        ),
+        deleteFn: editOpts ? () => {
+          cycle.wakeTime = null;
+          DB.save(appData);
+          editOpts.afterSave();
+          showToast('覚醒記録を取り消しました');
+        } : null
       });
     }
   });
@@ -887,12 +899,14 @@ function renderHistory() {
     // 概日リズムのずれ判定（深夜3時以降に入床）
     const bedHour = new Date(s.bedTime).getHours();
     const isLateCircadian = bedHour >= 3 && bedHour < 12;
+    const overlaps = sessionOverlapsSchedule(s);
 
     return `
       <div class="history-item" data-idx="${idx}" role="listitem">
         <div class="history-date">
           ${dateStr}
           ${isLateCircadian ? ' <span style="color:var(--warning);font-size:11px">概日ずれ</span>' : ''}
+          ${overlaps ? ' <span style="color:var(--danger);font-size:11px">活動時間帯</span>' : ''}
           ${s.notes ? ' <span style="color:var(--text-faint);font-size:11px">📝</span>' : ''}
         </div>
         <div class="history-times">
@@ -1054,6 +1068,112 @@ document.getElementById('detail-delete').addEventListener('click', () => {
 // ============================================================
 
 const AI_KEY_STORAGE = 'sleep-tracker-claude-key';
+const SCHEDULE_STORAGE = 'sleep-tracker-schedule';
+
+// ============================================================
+// 活動時間帯スケジュール
+// ============================================================
+
+const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+
+function loadSchedule() {
+  try {
+    return JSON.parse(localStorage.getItem(SCHEDULE_STORAGE) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveSchedule(data) {
+  localStorage.setItem(SCHEDULE_STORAGE, JSON.stringify(data));
+}
+
+/** セッションが活動時間帯と重複しているか判定 */
+function sessionOverlapsSchedule(session) {
+  if (!session.outOfBedTime) return false;
+  const schedule = loadSchedule();
+  if (Object.keys(schedule).length === 0) return false;
+
+  const bedDate = new Date(session.bedTime);
+  const outDate = new Date(session.outOfBedTime);
+
+  // セッションが跨ぐ各日を走査
+  const startDay = new Date(bedDate);
+  startDay.setHours(0, 0, 0, 0);
+  const endDay = new Date(outDate);
+  endDay.setHours(0, 0, 0, 0);
+
+  for (let d = new Date(startDay); d <= endDay; d.setDate(d.getDate() + 1)) {
+    const sched = schedule[d.getDay()];
+    if (!sched) continue;
+    const [sh, sm] = sched.start.split(':').map(Number);
+    const [eh, em] = sched.end.split(':').map(Number);
+    const schedStart = new Date(d);
+    schedStart.setHours(sh, sm, 0, 0);
+    const schedEnd = new Date(d);
+    schedEnd.setHours(eh, em, 0, 0);
+    if (bedDate < schedEnd && outDate > schedStart) return true;
+  }
+  return false;
+}
+
+function renderScheduleView() {
+  const content = document.getElementById('schedule-content');
+  if (!content) return;
+  const schedule = loadSchedule();
+
+  content.innerHTML = DAY_NAMES.map((name, day) => {
+    const sched = schedule[day] || null;
+    const enabled = !!sched;
+    const start = sched?.start || '09:00';
+    const end = sched?.end || '18:00';
+    return `
+      <div class="schedule-row">
+        <div class="schedule-row-header">
+          <span class="schedule-day-name">${name}曜</span>
+          <label class="schedule-toggle-wrap">
+            <input type="checkbox" class="schedule-check" data-day="${day}" ${enabled ? 'checked' : ''}>
+            <span class="schedule-toggle-label">${enabled ? 'ON' : 'OFF'}</span>
+          </label>
+        </div>
+        ${enabled ? `
+        <div class="schedule-times">
+          <input type="time" class="schedule-time-input modal-input" data-field="start" data-day="${day}" value="${start}" style="width:auto;flex:1">
+          <span class="schedule-time-sep">〜</span>
+          <input type="time" class="schedule-time-input modal-input" data-field="end" data-day="${day}" value="${end}" style="width:auto;flex:1">
+        </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  content.querySelectorAll('.schedule-check').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const day = parseInt(cb.dataset.day);
+      const s = loadSchedule();
+      if (cb.checked) {
+        s[day] = { start: '09:00', end: '18:00' };
+      } else {
+        delete s[day];
+      }
+      saveSchedule(s);
+      renderScheduleView();
+      showToast(cb.checked ? `${DAY_NAMES[day]}曜のスケジュールを設定しました` : `${DAY_NAMES[day]}曜のスケジュールを削除しました`);
+    });
+  });
+
+  content.querySelectorAll('.schedule-time-input').forEach((input) => {
+    input.addEventListener('change', () => {
+      const day = parseInt(input.dataset.day);
+      const field = input.dataset.field;
+      const s = loadSchedule();
+      if (s[day]) {
+        s[day][field] = input.value;
+        saveSchedule(s);
+      }
+    });
+  });
+}
 
 function renderMarkdown(text) {
   const escaped = text
@@ -1088,6 +1208,14 @@ function markdownToPlain(text) {
 }
 
 function buildSleepAnalysisPrompt(sessions, period) {
+  const schedule = loadSchedule();
+  const scheduleLines = Object.keys(schedule).length > 0
+    ? DAY_NAMES.map((name, day) => {
+        const s = schedule[day];
+        return s ? `${name}曜: ${s.start}〜${s.end}` : null;
+      }).filter(Boolean).join(', ')
+    : null;
+
   const lines = sessions.map((s) => {
     const parts = [
       fmtDate(s.bedTime),
@@ -1102,10 +1230,16 @@ function buildSleepAnalysisPrompt(sessions, period) {
     if (awk > 0) parts.push(`中途覚醒${awk}回`);
     const toilet = (s.toiletTrips || []).length;
     if (toilet > 0) parts.push(`夜間頻尿${toilet}回`);
+    if (sessionOverlapsSchedule(s)) parts.push('★活動時間帯と重複');
     if (s.notes) parts.push(`メモ:${s.notes}`);
     return parts.join(' | ');
   }).join('\n');
-  return `過去${period}日間の睡眠記録（新しい順）:\n\n${lines}\n\nこの記録のパターンや傾向について、気づいたことを教えてください。`;
+
+  const scheduleContext = scheduleLines
+    ? `\nユーザーの活動時間帯（起きていなければならない時間）:\n${scheduleLines}\n★マークはこの時間帯と重複した記録です。\n`
+    : '';
+
+  return `過去${period}日間の睡眠記録（新しい順）:${scheduleContext}\n${lines}\n\nこの記録のパターンや傾向について、気づいたことを教えてください。`;
 }
 
 async function fetchAIAnalysis(sessions, period) {
@@ -1274,6 +1408,7 @@ function generateDoctorReport(sessions, period) {
   const awkList      = sessions.map(awakeningCount);
   const toiletList   = sessions.map((s) => (s.toiletTrips || []).length);
   const insomniaCount = sessions.filter((s) => s.cycles.length === 0).length;
+  const overlapCount = sessions.filter(sessionOverlapsSchedule).length;
 
   const oldest = sessions[sessions.length - 1];
   const newest = sessions[0];
@@ -1310,6 +1445,7 @@ function generateDoctorReport(sessions, period) {
     `平均中途覚醒　　: ${avg(awkList).toFixed(1)}回`,
     avg(toiletList) > 0 ? `平均夜間頻尿　　: ${avg(toiletList).toFixed(1)}回` : null,
     insomniaCount > 0 ? `不眠の夜　　　　: ${insomniaCount}夜 / ${sessions.length}夜中` : null,
+    overlapCount > 0 ? `活動時間帯と重複: ${overlapCount}回 / ${sessions.length}件中` : null,
     '',
     '■ 個別記録（新しい順）',
     ...rows,
@@ -1493,6 +1629,7 @@ function render() {
   if (currentView === 'tracker') renderTracker();
   else if (currentView === 'history') renderHistory();
   else if (currentView === 'stats') renderStats();
+  else if (currentView === 'settings') renderScheduleView();
 }
 
 // ============================================================
@@ -1546,15 +1683,15 @@ document.getElementById('export-btn').addEventListener('click', () => {
 // ============================================================
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    // 既存のコントローラーがあればアップデート検知を有効にする
-    const hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (hadController) {
-        document.getElementById('update-banner').style.display = 'flex';
-      }
-    });
+  // controllerchange は load より前に発火することがあるため外で登録する
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController) {
+      document.getElementById('update-banner').style.display = 'flex';
+    }
+  });
 
+  window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(() => {
       console.log('Service Worker 登録完了');
     }).catch((err) => {
