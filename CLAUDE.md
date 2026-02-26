@@ -32,3 +32,50 @@ git push github main
 
 セッション開始時に `.claude/hooks/session-start.sh` が自動で
 `github` リモートと `push-github` エイリアスをセットアップする。
+
+## iOS Safari / Chrome の CSS 注意事項
+
+### input 要素の幅オーバー問題
+
+iOS のネイティブ form コントロール（`date`, `time`, `datetime-local` 等）は、
+CSS の `overflow: hidden` や `contain: paint` だけでは幅を制御できない場合がある。
+
+**必須対応：**
+
+```css
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;       /* ネイティブ描画を無効化 → CSS で幅を完全制御 */
+  width: 100%;
+  box-sizing: border-box;
+}
+```
+
+- `datetime-local` は iOS で幅が広くなりやすいため、`date` + `time` に分割して縦並びにする方が安全
+- PC Chrome の DevTools モバイルエミュレーションでは再現しない（実機 iOS でのみ発生）
+
+### `overflow-y: auto` と子要素の幅
+
+iOS WebKit では、親要素に `overflow-y: auto` を設定すると
+子要素の `width: 100%` がパディングを無視して計算されることがある。
+
+```css
+/* NG: 子要素が親のパディング分だけ幅オーバーする */
+.parent {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* OK: overflow は hidden にするか、内側にラッパーを置く */
+.parent {
+  padding: 20px;
+  overflow: hidden; /* または overflow-y: auto を使わない */
+}
+```
+
+### Service Worker のキャッシュ更新
+
+CSS を変更するたびに `sw.js` の `CACHE_NAME` バージョンを上げる。
+上げないと iOS はキャッシュを使い続けて変更が反映されない。
