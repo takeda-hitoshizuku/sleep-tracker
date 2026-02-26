@@ -35,6 +35,9 @@ git config alias.push-github "push github main"
 
 # main ブランチのトラッキングを github/main に設定
 git fetch github main --quiet 2>/dev/null || true
+if ! git rev-parse --verify main &>/dev/null; then
+  git branch main github/main
+fi
 git branch --set-upstream-to=github/main main 2>/dev/null || true
 
 echo "[session-start] github リモートと push-github エイリアスを設定しました。"
