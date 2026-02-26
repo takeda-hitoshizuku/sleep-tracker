@@ -818,6 +818,8 @@ body {
 
 .modal-input {
   display: block;
+  -webkit-appearance: none;
+  appearance: none;
   width: -webkit-fill-available;
   width: 100%;
   max-width: 100%;
