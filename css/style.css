@@ -756,6 +756,11 @@ body {
   animation: fadeIn 0.2s ease;
 }
 
+/* 時刻編集モーダルは詳細モーダルより前面に表示する */
+#modal-overlay {
+  z-index: 110;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
