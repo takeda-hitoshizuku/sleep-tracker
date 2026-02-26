@@ -169,3 +169,56 @@ graph LR
 トークンを逆順に変換して `.claude/github-token.rev` に保存している。
 
 詳細は [claude-on-the-web-setup.md](./claude-on-the-web-setup.md) を参照。
+
+---
+
+## 運用上の注意点
+
+### データが消えるリスクの段階
+
+```mermaid
+graph TD
+    A[作業中の変更] -->|commit しない| B[💀 コンテナリセットで完全消滅・回復不可]
+    A -->|commit する| C[commit 済み]
+    C -->|push しない| B
+    C -->|git push origin claude/xxx| D[origin に保存済み ✅]
+    D -->|merge + push-github しない| E[⚠️ 次セッションに引き継がれない\n手動回復は可能]
+    D -->|merge + push-github する| F[github/main に反映 ✅✅\n次セッションも自動で含まれる]
+```
+
+**commit + push さえしておけばデータは消えない。**
+origin の `claude/*` ブランチはコンテナリセット後も残る。
+
+### push し忘れたまま次のセッションが始まったとき
+
+次のセッションで手動回復できる：
+
+```bash
+git fetch origin
+git merge origin/claude/前セッションのブランチ名
+git push-github
+```
+
+### 注意が必要な 3 つのポイント
+
+**1. セッションは自分で終わらせるとは限らない**
+タイムアウトで勝手に切れることがある。こまめに `git push origin claude/xxx` しておく。
+
+**2. stop hook は origin への push しか確認しない**
+`push-github`（github/main への反映）はチェック対象外。
+セッション終了前に自分で確認が必要。
+
+**3. push-github せずに新セッションを始めると並行作業になる**
+新セッションは `github/main` の現在地から分岐する。
+前セッションで push-github していない commit は新セッションには含まれず、
+後でマージが必要になる。
+
+### セッション終了前の理想的な手順
+
+```
+1. git push origin claude/xxx     ← 最低限これだけは必ず
+2. git checkout main
+3. git merge --ff-only claude/xxx
+4. git push-github                ← これで次セッションに確実に引き継がれる
+5. git checkout claude/xxx
+```
