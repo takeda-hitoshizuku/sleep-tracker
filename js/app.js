@@ -1547,6 +1547,14 @@ document.getElementById('export-btn').addEventListener('click', () => {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
+    // 既存のコントローラーがあればアップデート検知を有効にする
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController) {
+        document.getElementById('update-banner').style.display = 'flex';
+      }
+    });
+
     navigator.serviceWorker.register('./sw.js').then(() => {
       console.log('Service Worker 登録完了');
     }).catch((err) => {
@@ -1554,6 +1562,10 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+
+document.getElementById('update-reload-btn').addEventListener('click', () => {
+  window.location.reload();
+});
 
 // ============================================================
 // 起動
