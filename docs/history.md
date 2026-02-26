@@ -2,6 +2,13 @@
 
 ## 2026-02-26
 
+### GitHub push 用セッション起動フックを追加
+
+`.claude/hooks/session-start.sh` を追加。新セッション開始時に自動で `github` リモートと `push-github` エイリアスを設定するようになった。
+トークンは `.claude/github-token` に保存（`.gitignore` で git 管理外）。
+
+
+
 ### アクションボタンに長押し操作を追加
 
 スクロール中の誤操作防止のため、センシティブなボタンを長押し（350ms）で発火するように変更。
