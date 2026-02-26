@@ -1143,6 +1143,85 @@ document.getElementById('detail-delete').addEventListener('click', () => {
 
 const AI_KEY_STORAGE = 'sleep-tracker-claude-key';
 const SCHEDULE_STORAGE = 'sleep-tracker-schedule';
+const SYMPTOMS_STORAGE = 'sleep-tracker-symptoms';
+
+// ============================================================
+// 睡眠症状・傾向
+// ============================================================
+
+const SYMPTOM_GROUPS = [
+  {
+    label: '寝れない系',
+    items: [
+      { id: 'insomnia',      label: '不眠症' },
+      { id: 'onset',         label: '入眠困難（なかなか眠れない）' },
+      { id: 'waso',          label: '中途覚醒（夜中に目が覚める）' },
+      { id: 'early_wake',    label: '早朝覚醒（朝早く目が覚める）' },
+    ],
+  },
+  {
+    label: '起きれない系',
+    items: [
+      { id: 'hypersomnia',   label: '過眠症（日中も眠い）' },
+      { id: 'od',            label: '起立性調節障害' },
+      { id: 'inertia',       label: '睡眠慣性（寝起きの強いだるさ）' },
+    ],
+  },
+  {
+    label: '不規則・昼夜逆転系',
+    items: [
+      { id: 'circadian',     label: '概日リズム睡眠障害' },
+      { id: 'dsps',          label: '睡眠相後退症候群（眠れる時間が遅い）' },
+      { id: 'shift',         label: '交代勤務（夜勤・変則シフト）' },
+    ],
+  },
+  {
+    label: 'その他',
+    items: [
+      { id: 'sas',           label: '睡眠時無呼吸症候群（SAS）' },
+      { id: 'rls',           label: 'むずむず脚症候群' },
+    ],
+  },
+];
+
+function loadSymptoms() {
+  try {
+    return JSON.parse(localStorage.getItem(SYMPTOMS_STORAGE) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveSymptoms(ids) {
+  localStorage.setItem(SYMPTOMS_STORAGE, JSON.stringify(ids));
+}
+
+function renderSymptomsView() {
+  const content = document.getElementById('symptoms-content');
+  if (!content) return;
+  const checked = new Set(loadSymptoms());
+
+  content.innerHTML = SYMPTOM_GROUPS.map((group) => `
+    <div class="symptom-group">
+      <div class="symptom-group-label">${group.label}</div>
+      ${group.items.map((item) => `
+        <label class="symptom-row">
+          <input type="checkbox" class="symptom-check" data-id="${item.id}" ${checked.has(item.id) ? 'checked' : ''}>
+          <span class="symptom-label">${item.label}</span>
+        </label>
+      `).join('')}
+    </div>
+  `).join('');
+
+  content.querySelectorAll('.symptom-check').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const all = Array.from(content.querySelectorAll('.symptom-check'))
+        .filter((c) => c.checked)
+        .map((c) => c.dataset.id);
+      saveSymptoms(all);
+    });
+  });
+}
 
 // ============================================================
 // 活動時間帯スケジュール
@@ -1249,6 +1328,40 @@ function renderScheduleView() {
   });
 }
 
+function renderSettingsView() {
+  renderSymptomsView();
+  renderScheduleView();
+
+  // アコーディオンの開閉（一つ開いたら他を閉じる）
+  const accordion = document.getElementById('settings-accordion');
+  if (!accordion) return;
+  // イベントが重複登録されないよう、既登録フラグで制御
+  if (accordion.dataset.ready) return;
+  accordion.dataset.ready = '1';
+
+  accordion.querySelectorAll('.accordion-header').forEach((header) => {
+    header.addEventListener('click', () => {
+      const targetId = header.dataset.target;
+      accordion.querySelectorAll('.accordion-item').forEach((item) => {
+        const isTarget = item.id === targetId;
+        const body = item.querySelector('.accordion-body');
+        const arrow = item.querySelector('.accordion-arrow');
+        const h = item.querySelector('.accordion-header');
+        if (isTarget) {
+          const opening = body.style.display === 'none';
+          body.style.display = opening ? '' : 'none';
+          arrow.textContent = opening ? '▲' : '▼';
+          h.setAttribute('aria-expanded', String(opening));
+        } else {
+          body.style.display = 'none';
+          arrow.textContent = '▼';
+          h.setAttribute('aria-expanded', 'false');
+        }
+      });
+    });
+  });
+}
+
 function renderMarkdown(text) {
   const escaped = text
     .replace(/&/g, '&amp;')
@@ -1313,7 +1426,18 @@ function buildSleepAnalysisPrompt(sessions, period) {
     ? `\nユーザーの活動時間帯（起きていなければならない時間）:\n${scheduleLines}\n★マークはこの時間帯と重複した記録です。\n`
     : '';
 
-  return `過去${period}日間の睡眠記録（新しい順）:${scheduleContext}\n${lines}\n\nこの記録のパターンや傾向について、気づいたことを教えてください。`;
+  const symptoms = loadSymptoms();
+  const symptomContext = symptoms.length > 0
+    ? `\nユーザーが申告している睡眠の症状・傾向:\n${symptoms.map((id) => {
+        for (const g of SYMPTOM_GROUPS) {
+          const item = g.items.find((i) => i.id === id);
+          if (item) return `- ${item.label}`;
+        }
+        return null;
+      }).filter(Boolean).join('\n')}\n`
+    : '';
+
+  return `過去${period}日間の睡眠記録（新しい順）:${symptomContext}${scheduleContext}\n${lines}\n\nこの記録のパターンや傾向について、気づいたことを教えてください。`;
 }
 
 async function fetchAIAnalysis(sessions, period) {
@@ -1321,9 +1445,22 @@ async function fetchAIAnalysis(sessions, period) {
   if (!apiKey) throw new Error('APIキーが設定されていません');
   if (sessions.length === 0) throw new Error('分析できる記録がありません');
 
+  const userSymptoms = loadSymptoms();
+  const symptomDescriptions = userSymptoms.map((id) => {
+    for (const g of SYMPTOM_GROUPS) {
+      const item = g.items.find((i) => i.id === id);
+      if (item) return item.label;
+    }
+    return null;
+  }).filter(Boolean);
+  const symptomNote = symptomDescriptions.length > 0
+    ? `ユーザーが申告している症状: ${symptomDescriptions.join('、')}`
+    : 'ユーザーは睡眠に何らかの悩みを抱えている';
+
   const systemPrompt = `あなたは睡眠データを分析するフレンドリーなアシスタントです。以下の前提を守ること：
-- ユーザーは不眠症を含む複数の睡眠障害を抱えている
+- ${symptomNote}
 - 睡眠0分などの極端なデータは記録ミスではなく、実際に眠れていない可能性を第一前提とすること
+- 申告された症状の特性（例：入眠困難なら入眠潜時に注目、中途覚醒なら覚醒回数に注目など）を踏まえて分析すること
 - 不安を抱えているため、温かく支持的なトーンで接すること
 - 医療的診断は行わない
 
@@ -1703,7 +1840,7 @@ function render() {
   if (currentView === 'tracker') renderTracker();
   else if (currentView === 'history') renderHistory();
   else if (currentView === 'stats') renderStats();
-  else if (currentView === 'settings') renderScheduleView();
+  else if (currentView === 'settings') renderSettingsView();
 }
 
 // ============================================================

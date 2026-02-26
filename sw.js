@@ -1,5 +1,5 @@
 // Service Worker for 睡眠トラッカー PWA
-const CACHE_NAME = 'sleep-tracker-v16';
+const CACHE_NAME = 'sleep-tracker-v17';
 
 // self.registration.scope を使って GitHub Pages のサブパスに対応
 const SCOPE = self.registration.scope;

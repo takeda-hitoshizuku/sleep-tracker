@@ -1178,6 +1178,103 @@ body {
   color: var(--text-muted);
 }
 
+/* --- 設定アコーディオン --- */
+.accordion {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.accordion-item {
+  border-bottom: 1px solid var(--border);
+}
+
+.accordion-item:last-child {
+  border-bottom: none;
+}
+
+.accordion-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--surface);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  gap: 8px;
+}
+
+.accordion-header:active {
+  background: var(--surface2);
+}
+
+.accordion-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.accordion-arrow {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.accordion-body {
+  padding: 0 16px 16px;
+  background: var(--surface);
+}
+
+/* --- 症状チェックリスト --- */
+.symptom-group {
+  margin-bottom: 16px;
+}
+
+.symptom-group:last-child {
+  margin-bottom: 0;
+}
+
+.symptom-group-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.symptom-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.symptom-row:last-child {
+  border-bottom: none;
+}
+
+.symptom-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--primary);
+}
+
+.symptom-label {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
 /* --- ダークモード強制 --- */
 @media (prefers-color-scheme: light) {
   /* アプリは常にダークモード */

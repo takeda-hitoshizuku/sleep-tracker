@@ -89,10 +89,29 @@
     <!-- 設定ビュー -->
     <div id="view-settings" class="view" role="main" aria-label="設定">
       <h2 class="view-title">設定</h2>
-      <div class="section">
-        <div class="section-title">活動時間帯</div>
-        <p class="settings-hint">この時間帯に床に入っている場合、履歴・レポート・AI分析にフラグを表示します。</p>
-        <div id="schedule-content"></div>
+      <div class="accordion" id="settings-accordion">
+        <!-- 症状・傾向 -->
+        <div class="accordion-item" id="acc-symptoms">
+          <button class="accordion-header" data-target="acc-symptoms" aria-expanded="true">
+            <span class="accordion-title">睡眠の症状・傾向</span>
+            <span class="accordion-arrow">▲</span>
+          </button>
+          <div class="accordion-body">
+            <p class="settings-hint">当てはまるものを選ぶと、AI分析がより的確になります。</p>
+            <div id="symptoms-content"></div>
+          </div>
+        </div>
+        <!-- 活動時間帯 -->
+        <div class="accordion-item" id="acc-schedule">
+          <button class="accordion-header" data-target="acc-schedule" aria-expanded="false">
+            <span class="accordion-title">活動時間帯</span>
+            <span class="accordion-arrow">▼</span>
+          </button>
+          <div class="accordion-body" style="display:none">
+            <p class="settings-hint">この時間帯に床に入っている場合、履歴・レポート・AI分析にフラグを表示します。</p>
+            <div id="schedule-content"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
