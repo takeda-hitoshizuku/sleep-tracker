@@ -948,6 +948,37 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+/* --- アップデートバナー --- */
+#update-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  background: var(--primary-dark);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  padding-top: calc(12px + var(--safe-top));
+  font-size: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
+#update-banner button {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
 /* --- ノート確認プロンプト --- */
 .note-confirm {
   background: var(--surface2);
