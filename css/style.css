@@ -812,11 +812,13 @@ body {
   display: block;
   overflow: hidden;
   contain: paint;
+  clip-path: inset(0);
   margin-bottom: 16px;
 }
 
 .modal-input {
   display: block;
+  width: -webkit-fill-available;
   width: 100%;
   max-width: 100%;
   min-width: 0;
