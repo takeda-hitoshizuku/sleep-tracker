@@ -811,6 +811,7 @@ body {
 #modal-input-group {
   display: block;
   overflow: hidden;
+  contain: paint;
   margin-bottom: 16px;
 }
 
