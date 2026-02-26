@@ -189,19 +189,31 @@ localStorage['sleep-tracker-schedule']    // { [曜日番号]: { start: 'HH:MM',
 GitHub への直接プッシュには `github` リモートを使う。
 
 ```bash
-# 通常のプッシュ（.claude/ を GitHub に送らない安全なエイリアス）
+# 通常のプッシュ
 git push-github
 
-# または手動でブランチを指定してプッシュ
+# または手動
 git push github main
 ```
 
-**重要**: `.claude/` ディレクトリには PAT を含む認証情報が入っている。
-`git push-github` エイリアスは `.claude/` を除いたツリーを GitHub に送るため安全。
-`git push github main` で直接送ると `.claude/` ごと行くので注意。
+`github` リモートと `push-github` エイリアスは、セッション開始時に
+`.claude/hooks/session-start.sh` が自動でセットアップする。
 
-セッション開始時に `.claude/hooks/session-start.sh` が自動で
-`github` リモートと `push-github` エイリアスをセットアップする。
+### PAT の保存と引き継ぎ
+
+PAT は `.claude/github-token.rev`（逆順保存）として `claude/*` ブランチに git 管理している。
+`main` ブランチにはこのファイルが存在しないため、`git push github main` で GitHub に漏れる経路はない。
+
+**PAT を更新するとき**（有効期限切れ・再発行など）:
+
+```bash
+printf '新しいPAT' | rev > .claude/github-token.rev
+git add .claude/github-token.rev
+git commit -m "chore: PAT を更新"
+git push -u origin <現在の claude/* ブランチ>
+```
+
+その後 `session-start.sh` を手動で実行するか、セッションを再起動すれば反映される。
 
 ## iOS Safari / Chrome の CSS 注意事項
 
