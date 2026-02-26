@@ -773,7 +773,7 @@ body {
   width: 100%;
   max-width: 480px;
   max-height: 85dvh;
-  overflow-y: auto;
+  overflow: hidden;
   animation: slideUp 0.25s ease;
   border-top: 1px solid var(--border);
 }
