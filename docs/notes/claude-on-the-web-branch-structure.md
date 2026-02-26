@@ -4,16 +4,26 @@
 
 Claude on the web でコードを書くとき、裏側では以下のことが起きている。
 
-```
-GitHub (github/main)
-    │
-    │  セッション開始時に「今日の作業用ブランチ」を切る
-    ▼
-claude/作業ブランチ-Xxxxx   ← ここで実際に作業する
-    │
-    │  作業完了後、main にマージして GitHub に反映
-    ▼
-GitHub (github/main) ← GitHub Pages はここから配信
+```mermaid
+gitGraph
+   commit id: "初期コミット"
+   commit id: "既存の作業"
+
+   branch claude/session-A
+   checkout claude/session-A
+   commit id: "セッションAの作業1"
+   commit id: "セッションAの作業2"
+
+   checkout main
+   merge claude/session-A id: "mainに反映"
+
+   branch claude/session-B
+   checkout claude/session-B
+   commit id: "セッションBの作業1"
+   commit id: "セッションBの作業2"
+
+   checkout main
+   merge claude/session-B id: "mainに反映2"
 ```
 
 セッションをまたいでも**本流は github/main ひとつ**。
@@ -32,12 +42,20 @@ Claude on the web は**セッションのたびにコンテナ（作業環境）
 
 結果として `master` は「**前セッションの終点マーカー**」として毎回自動生成される。
 
-```
-セッション1: claude/xxx-A で作業
-セッション2 開始: master = claude/xxx-A の先端  ← インフラが自動で作る
-              → claude/xxx-B で作業
-セッション3 開始: master = claude/xxx-B の先端  ← またインフラが作る
-              → claude/xxx-C で作業
+```mermaid
+sequenceDiagram
+    participant I as インフラ（自動）
+    participant L as ローカル git
+    participant O as origin（プロキシ）
+
+    Note over I,O: セッション2 開始時
+    I->>L: master を作成し<br/>前セッション(claude/xxx-A)の先端に移動
+    I->>L: claude/xxx-B ブランチを作成・checkout
+    Note over L: master は放置される（触られない）
+
+    Note over I,O: セッション3 開始時
+    I->>L: master を前セッション(claude/xxx-B)の先端に上書き
+    I->>L: claude/xxx-C ブランチを作成・checkout
 ```
 
 **削除しても次のセッションで復活する（ゾンビ）**。インフラが作るので防げない。
@@ -97,22 +115,28 @@ git branch --set-upstream-to=github/main main 2>/dev/null || true
 
 ## 作業フロー（まとめ）
 
-```
-セッション開始
-  → session-start.sh が自動実行
-  → github リモート設定（PAT を github-token.rev から復元）
-  → ローカル main がなければ github/main から作成
-  → main のトラッキングを github/main に設定
+```mermaid
+sequenceDiagram
+    participant H as session-start.sh
+    participant L as ローカル git
+    participant O as origin（プロキシ）
+    participant G as github（GitHub直接）
 
-作業中
-  → claude/* ブランチで commit を積む
-  → git push origin claude/xxx  （origin = ローカルプロキシ経由）
+    Note over H,G: セッション開始時（自動）
+    H->>L: github リモートを設定（PAT復元）
+    H->>G: git fetch github main
+    H->>L: ローカル main がなければ作成
+    H->>L: main のトラッキングを github/main に設定
 
-GitHub に反映したいとき
-  → git checkout main
-  → git merge --ff-only claude/xxx
-  → git push-github             （= git push github main）
-  → git checkout claude/xxx     （作業ブランチに戻る）
+    Note over H,G: 作業中（手動）
+    L->>L: claude/* ブランチで commit
+    L->>O: git push origin claude/xxx
+
+    Note over H,G: GitHub Pages に反映したいとき（手動）
+    L->>L: git checkout main
+    L->>L: git merge --ff-only claude/xxx
+    L->>G: git push-github（= git push github main）
+    L->>L: git checkout claude/xxx
 ```
 
 ---
@@ -123,6 +147,19 @@ GitHub に反映したいとき
 |---|---|---|
 | `origin` | ローカルプロキシ (127.0.0.1) | `claude/*` ブランチのみ push 可。main への push は 403 エラー |
 | `github` | github.com (PAT 入り) | `main` を GitHub Pages に反映するための直接ルート |
+
+```mermaid
+graph LR
+    L[ローカル git]
+
+    L -->|git push origin claude/xxx\n✅ 通る| O[origin\nローカルプロキシ]
+    L -->|git push origin main\n❌ 403エラー| O
+
+    L -->|git push-github\n= git push github main\n✅ 通る| G[github\nGitHub直接]
+
+    O --- GH[GitHub\ngithub.com]
+    G --- GH
+```
 
 ---
 
