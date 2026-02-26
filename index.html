@@ -84,19 +84,6 @@
     </div>
   </div>
 
-  <!-- 時刻編集モーダル -->
-  <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title" style="display:none">
-    <div class="modal">
-      <h3 class="modal-title" id="modal-title">時刻を修正</h3>
-      <p class="modal-hint" id="modal-hint"></p>
-      <input type="datetime-local" id="modal-input" class="modal-input">
-      <div class="modal-actions">
-        <button class="btn-secondary" id="modal-cancel">キャンセル</button>
-        <button class="btn-primary" id="modal-confirm">確定</button>
-      </div>
-    </div>
-  </div>
-
   <!-- セッション詳細モーダル -->
   <div class="modal-overlay" id="detail-overlay" role="dialog" aria-modal="true" style="display:none">
     <div class="modal modal-wide">
@@ -107,6 +94,19 @@
       <div id="detail-content"></div>
       <div class="modal-actions">
         <button class="btn-danger" id="detail-delete">この記録を削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 時刻編集モーダル（詳細モーダルより後に置き、重なった時に前面に出るようにする） -->
+  <div class="modal-overlay" id="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title" style="display:none">
+    <div class="modal">
+      <h3 class="modal-title" id="modal-title">時刻を修正</h3>
+      <p class="modal-hint" id="modal-hint"></p>
+      <input type="datetime-local" id="modal-input" class="modal-input">
+      <div class="modal-actions">
+        <button class="btn-secondary" id="modal-cancel">キャンセル</button>
+        <button class="btn-primary" id="modal-confirm">確定</button>
       </div>
     </div>
   </div>
