@@ -1,1 +1,3 @@
-.claude/
+# .claude/ 配下のうち認証情報のみ除外
+# hooks/ や settings.json はリポジトリで管理する
+.claude/github-token
