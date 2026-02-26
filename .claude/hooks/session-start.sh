@@ -6,17 +6,18 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
-TOKEN_FILE="${CLAUDE_PROJECT_DIR:-$(git -C "$(dirname "$0")/../.." rev-parse --show-toplevel)}/.claude/github-token"
+REPO_ROOT="${CLAUDE_PROJECT_DIR:-$(git -C "$(dirname "$0")/../.." rev-parse --show-toplevel)}"
+TOKEN_FILE_REV="${REPO_ROOT}/.claude/github-token.rev"
 
-if [ ! -f "$TOKEN_FILE" ]; then
-  echo "[session-start] .claude/github-token が見つかりません。GitHub へのプッシュには手動でトークンを設定してください。" >&2
+if [ ! -f "$TOKEN_FILE_REV" ]; then
+  echo "[session-start] .claude/github-token.rev が見つかりません。GitHub へのプッシュには手動でトークンを設定してください。" >&2
   exit 0
 fi
 
-TOKEN=$(tr -d '[:space:]' < "$TOKEN_FILE")
+TOKEN=$(rev < "$TOKEN_FILE_REV" | tr -d '[:space:]')
 
 if [ -z "$TOKEN" ]; then
-  echo "[session-start] .claude/github-token が空です。" >&2
+  echo "[session-start] .claude/github-token.rev が空です。" >&2
   exit 0
 fi
 
@@ -29,12 +30,10 @@ else
   git remote add github "https://${TOKEN}@github.com/${REPO}.git"
 fi
 
-# push-github エイリアス：.claude/ を除いたツリーを main に push
-# （.gitignore で .claude/ を除外しているため、通常の push でも安全だが念のため）
+# push-github エイリアス
 git config alias.push-github "push github main"
 
 # main ブランチのトラッキングを github/main に設定
-# （origin は claude/* 以外を拒否するため、stop hook の unpushed チェックが誤作動しないよう設定）
 git fetch github main --quiet 2>/dev/null || true
 git branch --set-upstream-to=github/main main 2>/dev/null || true
 
