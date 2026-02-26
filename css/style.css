@@ -809,24 +809,32 @@ body {
 }
 
 #modal-input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: block;
+  overflow: hidden;
   margin-bottom: 16px;
 }
 
 .modal-input {
+  display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
   padding: 14px 16px;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
   font-size: 16px;
-  font-family: 'SF Mono', 'Menlo', monospace;
-  margin-bottom: 0;
+  font-family: -apple-system, system-ui, sans-serif;
+  margin-bottom: 8px;
   outline: none;
   color-scheme: dark;
+}
+
+.modal-input:last-child {
+  margin-bottom: 0;
 }
 
 .modal-input:focus {
