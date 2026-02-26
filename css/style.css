@@ -314,6 +314,35 @@ body {
   user-select: none;
   text-align: left;
   min-height: 72px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 長押しインジケータ（ドーナツリング） */
+.long-press-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 56px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.08s;
+}
+
+.long-press-ring circle {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 28px 28px;
+}
+
+/* 目覚めたボタン（黄色背景）はリングを暗めに */
+.btn-action--wake .long-press-ring circle {
+  stroke: rgba(0, 0, 0, 0.35);
 }
 
 .btn-action:active {

@@ -329,6 +329,77 @@ function vibrate(pattern) {
 }
 
 // ============================================================
+// 長押しユーティリティ（ドーナツリング付き）
+// ============================================================
+
+function addLongPress(btn, callback, duration = 350) {
+  // ドーナツリング SVG をボタン内に追加
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.classList.add('long-press-ring');
+  svg.setAttribute('viewBox', '0 0 56 56');
+  svg.setAttribute('aria-hidden', 'true');
+  const circle = document.createElementNS(ns, 'circle');
+  circle.setAttribute('cx', '28');
+  circle.setAttribute('cy', '28');
+  circle.setAttribute('r', '22');
+  svg.appendChild(circle);
+  btn.appendChild(svg);
+
+  const circumference = 2 * Math.PI * 22; // ≈ 138.2
+  circle.style.strokeDasharray = `${circumference}`;
+  circle.style.strokeDashoffset = `${circumference}`;
+
+  let timer = null;
+  let rafId = null;
+  let startTime = null;
+  let isTouchDevice = false;
+
+  function startRing() {
+    svg.style.opacity = '1';
+    startTime = performance.now();
+    function frame(now) {
+      const progress = Math.min((now - startTime) / duration, 1);
+      circle.style.strokeDashoffset = circumference * (1 - progress);
+      if (progress < 1) rafId = requestAnimationFrame(frame);
+    }
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function stopRing() {
+    cancelAnimationFrame(rafId);
+    svg.style.opacity = '0';
+    circle.style.strokeDashoffset = `${circumference}`;
+  }
+
+  function doCancel() {
+    clearTimeout(timer);
+    timer = null;
+    stopRing();
+  }
+
+  btn.addEventListener('touchstart', () => {
+    if (btn.disabled) return;
+    isTouchDevice = true;
+    startRing();
+    timer = setTimeout(() => {
+      stopRing();
+      vibrate([30, 20, 30]);
+      callback();
+    }, duration);
+  }, { passive: true });
+
+  btn.addEventListener('touchend', doCancel);
+  btn.addEventListener('touchmove', doCancel);
+  btn.addEventListener('touchcancel', doCancel);
+
+  // デスクトップ用フォールバック（タッチデバイスでは合成 click を無視）
+  btn.addEventListener('click', () => {
+    if (!isTouchDevice) callback();
+  });
+}
+
+// ============================================================
 // トースト通知
 // ============================================================
 
@@ -652,7 +723,7 @@ function renderActions(state, s) {
         <span class="btn-action__icon">💤</span>
         <span class="btn-action__body">
           <span class="btn-action__label">眠る（推定）</span>
-          <span class="btn-action__sub">眠れたと思った瞬間にタップ</span>
+          <span class="btn-action__sub">眠れたと思った瞬間に長押し</span>
         </span>
       </button>
       <button class="btn-action btn-action--toilet" id="btn-toilet">
@@ -676,7 +747,7 @@ function renderActions(state, s) {
         <span class="btn-action__icon">☀️</span>
         <span class="btn-action__body">
           <span class="btn-action__label">目覚めた</span>
-          <span class="btn-action__sub">目が覚めたらタップ</span>
+          <span class="btn-action__sub">目が覚めたら長押し</span>
         </span>
       </button>
       <button class="btn-action btn-action--sleep btn-action--dim" id="btn-sleep" disabled>
@@ -709,7 +780,7 @@ function renderActions(state, s) {
         <span class="btn-action__icon">💤</span>
         <span class="btn-action__body">
           <span class="btn-action__label">また眠る（推定）</span>
-          <span class="btn-action__sub">再び眠れたと思った瞬間にタップ</span>
+          <span class="btn-action__sub">再び眠れたと思った瞬間に長押し</span>
         </span>
       </button>
       <button class="btn-action btn-action--toilet" id="btn-toilet">
@@ -731,12 +802,15 @@ function renderActions(state, s) {
 
   container.innerHTML = html;
 
-  // イベント設定
+  // イベント設定（布団に入る・布団から出る はタップ、それ以外は長押し）
   document.getElementById('btn-bed')?.addEventListener('click', actionBed);
-  document.getElementById('btn-sleep')?.addEventListener('click', actionSleep);
-  document.getElementById('btn-wake')?.addEventListener('click', actionWake);
   document.getElementById('btn-out')?.addEventListener('click', actionOutOfBed);
-  document.getElementById('btn-toilet')?.addEventListener('click', actionToilet);
+  const btnSleep = document.getElementById('btn-sleep');
+  if (btnSleep) addLongPress(btnSleep, actionSleep);
+  const btnWake = document.getElementById('btn-wake');
+  if (btnWake) addLongPress(btnWake, actionWake);
+  const btnToilet = document.getElementById('btn-toilet');
+  if (btnToilet) addLongPress(btnToilet, actionToilet);
   document.getElementById('btn-out-no-sleep')?.addEventListener('click', () => {
     // 一度も眠れなかった場合の離床
     if (s.cycles.length === 0) {
