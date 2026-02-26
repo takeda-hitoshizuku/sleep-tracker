@@ -815,7 +815,7 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-size: 18px;
+  font-size: 16px;
   font-family: 'SF Mono', 'Menlo', monospace;
   margin-bottom: 16px;
   outline: none;
