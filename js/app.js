@@ -365,10 +365,18 @@ function localToIso(localStr) {
 function openEditModal(title, hint, currentIso, onConfirm) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-hint').textContent = hint;
-  const input = document.getElementById('modal-input');
-  input.style.display = ''; // showConfirm で非表示になっていた場合にリセット
-  input.value = isoToLocal(currentIso);
-  input.max = isoToLocal(new Date().toISOString());
+  document.getElementById('modal-input-group').style.display = '';
+
+  const d = new Date(currentIso);
+  const pad = n => String(n).padStart(2, '0');
+  const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  document.getElementById('modal-input-date').value = dateStr;
+  document.getElementById('modal-input-time').value = timeStr;
+
+  const now = new Date();
+  document.getElementById('modal-input-date').max =
+    `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
   const overlay = document.getElementById('modal-overlay');
   overlay.style.display = 'flex';
@@ -378,18 +386,19 @@ function openEditModal(title, hint, currentIso, onConfirm) {
 
 function closeEditModal() {
   document.getElementById('modal-overlay').style.display = 'none';
-  document.getElementById('modal-input').style.display = ''; // 常にリセット
+  document.getElementById('modal-input-group').style.display = '';
   pendingEdit = null;
 }
 
 document.getElementById('modal-confirm').addEventListener('click', () => {
   if (!pendingEdit) return;
-  const inputEl = document.getElementById('modal-input');
-  if (inputEl.style.display !== 'none') {
+  const group = document.getElementById('modal-input-group');
+  if (group.style.display !== 'none') {
     // 時刻編集モード: 値が必要
-    const val = inputEl.value;
-    if (!val) { showToast('時刻を入力してください'); return; }
-    pendingEdit.onConfirm(localToIso(val));
+    const date = document.getElementById('modal-input-date').value;
+    const time = document.getElementById('modal-input-time').value;
+    if (!date || !time) { showToast('時刻を入力してください'); return; }
+    pendingEdit.onConfirm(new Date(`${date}T${time}`).toISOString());
   } else {
     // 確認ダイアログモード: 値不要
     pendingEdit.onConfirm(null);
@@ -737,8 +746,7 @@ function renderActions(state, s) {
 function showConfirm(title, message, onOk) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-hint').textContent = message;
-  const inputEl = document.getElementById('modal-input');
-  inputEl.style.display = 'none';
+  document.getElementById('modal-input-group').style.display = 'none';
 
   const cancelBtn = document.getElementById('modal-cancel');
   const confirmBtn = document.getElementById('modal-confirm');
@@ -750,14 +758,12 @@ function showConfirm(title, message, onOk) {
 
   pendingEdit = {
     onConfirm: () => {
-      inputEl.style.display = '';
       onOk();
     }
   };
 
   // Cancelで入力を元に戻す
   cancelBtn.onclick = () => {
-    inputEl.style.display = '';
     confirmBtn.textContent = '確定';
     cancelBtn.textContent = 'キャンセル';
     closeEditModal();
