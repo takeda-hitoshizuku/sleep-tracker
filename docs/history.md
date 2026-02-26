@@ -2,6 +2,11 @@
 
 ## 2026-02-26
 
+### session-start フックのバグ修正：ローカル main が消えると push できない問題
+
+コンテナリセット後にローカル `main` ブランチが存在しない場合、`git push-github` が失敗する問題を修正。
+`session-start.sh` に `main` の存在チェックと `github/main` からの自動作成処理を追加した。
+
 ### GitHub push 用セッション起動フックを追加
 
 `.claude/hooks/session-start.sh` を追加。新セッション開始時に自動で `github` リモートと `push-github` エイリアスを設定するようになった。
