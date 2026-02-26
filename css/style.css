@@ -1011,6 +1011,22 @@ body {
   margin: 4px 0;
 }
 
+.ai-result h2.ai-heading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 14px 0 4px;
+  letter-spacing: 0.03em;
+}
+
+.ai-result h2.ai-heading:first-child {
+  margin-top: 0;
+}
+
+.ai-result p {
+  margin: 0 0 6px;
+}
+
 .ai-loading {
   text-align: center;
   padding: 20px;

@@ -366,6 +366,7 @@ function openEditModal(title, hint, currentIso, onConfirm) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-hint').textContent = hint;
   const input = document.getElementById('modal-input');
+  input.style.display = ''; // showConfirm で非表示になっていた場合にリセット
   input.value = isoToLocal(currentIso);
   input.max = isoToLocal(new Date().toISOString());
 
@@ -377,6 +378,7 @@ function openEditModal(title, hint, currentIso, onConfirm) {
 
 function closeEditModal() {
   document.getElementById('modal-overlay').style.display = 'none';
+  document.getElementById('modal-input').style.display = ''; // 常にリセット
   pendingEdit = null;
 }
 
@@ -1047,6 +1049,38 @@ document.getElementById('detail-delete').addEventListener('click', () => {
 
 const AI_KEY_STORAGE = 'sleep-tracker-claude-key';
 
+function renderMarkdown(text) {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  const lines = escaped.split('\n');
+  let html = '';
+  let inParagraph = false;
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      if (inParagraph) { html += '</p>'; inParagraph = false; }
+      html += `<h2 class="ai-heading">${line.slice(3)}</h2>`;
+    } else if (line.trim() === '') {
+      if (inParagraph) { html += '</p>'; inParagraph = false; }
+    } else {
+      const formatted = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      if (!inParagraph) { html += '<p>'; inParagraph = true; }
+      else html += '<br>';
+      html += formatted;
+    }
+  }
+  if (inParagraph) html += '</p>';
+  return html;
+}
+
+function markdownToPlain(text) {
+  return text
+    .replace(/^## (.+)$/gm, '[$1]')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .trim();
+}
+
 function buildSleepAnalysisPrompt(sessions, period) {
   const lines = sessions.map((s) => {
     const parts = [
@@ -1073,6 +1107,34 @@ async function fetchAIAnalysis(sessions, period) {
   if (!apiKey) throw new Error('APIキーが設定されていません');
   if (sessions.length === 0) throw new Error('分析できる記録がありません');
 
+  const systemPrompt = `あなたは睡眠データを分析するフレンドリーなアシスタントです。以下の前提を守ること：
+- ユーザーは不眠症を含む複数の睡眠障害を抱えている
+- 睡眠0分などの極端なデータは記録ミスではなく、実際に眠れていない可能性を第一前提とすること
+- 不安を抱えているため、温かく支持的なトーンで接すること
+- 医療的診断は行わない
+
+以下の出力ルールを守ること：
+- Markdownで出力する（見出しは ## を使用）
+- 絵文字は使わない
+- 箇条書きは使わない
+- 必ず連続した文章（段落）で書くこと
+
+必ず以下の構成で出力すること：
+
+## 今日の記録
+（データの事実を1〜2文で要約）
+
+## ひとこと
+（温かいトーンで一言コメント）
+
+以下は分析結果に応じて必要な場合のみ追加すること：
+
+## 気になること
+（懸念点がある場合のみ）
+
+## おすすめ
+（具体的なアドバイスがある場合のみ）`;
+
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -1084,7 +1146,7 @@ async function fetchAIAnalysis(sessions, period) {
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
-      system: 'あなたは睡眠データを分析するフレンドリーなアシスタントです。ユーザーの睡眠記録のパターンや傾向を観察し、一般的な睡眠衛生の視点でコメントしてください。医療的診断は行わず、温かく支持的なトーンで日本語で回答してください。見出しやセクション名は使わず、自然な文章で回答してください。',
+      system: systemPrompt,
       messages: [{ role: 'user', content: buildSleepAnalysisPrompt(sessions, period) }]
     })
   });
@@ -1135,8 +1197,9 @@ function renderAISection(sessions, period) {
     `;
   } else if (cacheValid && cache.result) {
     inner += `
-      <div class="ai-result">${cache.result.replace(/\n/g, '<br>')}</div>
+      <div class="ai-result">${renderMarkdown(cache.result)}</div>
       <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn-secondary" id="ai-copy" style="font-size:13px;padding:10px">コピー</button>
         <button class="btn-secondary" id="ai-run" style="font-size:13px;padding:10px">再分析</button>
         <button class="btn-secondary" id="ai-clear-key" style="font-size:13px;padding:10px">キーを変更</button>
       </div>
@@ -1164,6 +1227,16 @@ function renderAISection(sessions, period) {
     localStorage.removeItem(AI_KEY_STORAGE);
     aiResultCache = null;
     renderAISection(sessions, period);
+  });
+
+  document.getElementById('ai-copy')?.addEventListener('click', async () => {
+    const plain = markdownToPlain(cache.result);
+    try {
+      await navigator.clipboard.writeText(plain);
+      showToast('コピーしました');
+    } catch {
+      showToast('コピーに失敗しました');
+    }
   });
 
   document.getElementById('ai-run')?.addEventListener('click', async () => {
